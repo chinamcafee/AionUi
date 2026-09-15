@@ -19,6 +19,8 @@ import classNames from 'classnames';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertLatexDelimiters } from '@renderer/utils/chat/latexDelimiters';
+import { stripKnowledgeCitationMarkers } from '@renderer/services/knowledge/citations';
+import { stripMemorizeBlocks, stripInjectionBlock } from '@renderer/services/memory/memoryInjection';
 import LocalImageView from '@renderer/components/media/LocalImageView';
 import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
@@ -52,6 +54,12 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
     const normalizedChildren = useMemo(() => {
       if (typeof childrenProp === 'string') {
         let text = childrenProp.replace(/file:\/\//g, '');
+        // 团队知识合成输出的机器引用标识（cite_*）不进入渲染（T5.5，无标记时为 no-op）
+        if (text.includes('cite_')) text = stripKnowledgeCitationMarkers(text);
+        // 记忆协议标记（<memorize>）不进入气泡渲染（E-14，无标记时为 no-op）
+        if (text.includes('<memorize')) text = stripMemorizeBlocks(text);
+        // 团队记忆注入块（含协议指令）不进入任何 Markdown 渲染（E-15 双保险）
+        if (text.includes('<!-- aionui-team-context -->')) text = stripInjectionBlock(text);
         text = convertLatexDelimiters(text);
         return text;
       }

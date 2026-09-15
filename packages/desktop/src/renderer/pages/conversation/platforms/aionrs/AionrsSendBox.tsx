@@ -7,6 +7,8 @@
 import { ipcBridge } from '@/common';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
+import { useMessageList } from '@renderer/pages/conversation/Messages/hooks';
+import { enhanceInputWithTeamMemory, useTeamMemoryTurnExtract, INJECTION_MARK } from '@/renderer/services/memory/memoryInjection';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -124,6 +126,7 @@ const AionrsSendBox: React.FC<{
   teamSendMessage?: (payload: { input: string; files: ChatFileRef[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
 }> = ({ conversation_id, modelSelection, session_mode, agent_name, teamSendMessage, teamRuntime }) => {
+  const messages = useMessageList();
   const [dynamicModes, setDynamicModes] = useState<AgentModeOption[]>([]);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
@@ -155,6 +158,7 @@ const AionrsSendBox: React.FC<{
       },
     }
   );
+  useTeamMemoryTurnExtract(messages, Boolean(running));
   const runtimeView = useConversationRuntimeView(conversation_id);
   const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
@@ -252,12 +256,18 @@ const AionrsSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files, sessions }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
+    async ({ input: rawInput, files, sessions }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
         throw new Error('No model selected');
       }
+
+      // 团队记忆协议注入（E-15）：收口在 executeCommand——覆盖首条消息（initial）、
+      // 命令队列、常规发送与打断优先全部路径；INJECTION_MARK 防重复包装。
+      const input = rawInput.includes(INJECTION_MARK)
+        ? rawInput
+        : await enhanceInputWithTeamMemory(rawInput, { messages });
 
       // The message body is plain user text; the backend resolves each
       // ChatFileRef to an absolute path and injects the [[AION_FILES]] marker at
@@ -405,7 +415,9 @@ const AionrsSendBox: React.FC<{
     clearFiles();
     setSelectedSessions([]);
     emitter.emit('aionrs.selected.file.clear');
-    await executeCommand({ input: message, files: filesToSend, sessions });
+    // 团队记忆注入 + 上一轮抽取（未启用/失败时原样返回，见 services/memory/memoryInjection）
+    const enhanced = await enhanceInputWithTeamMemory(message, { messages });
+    await executeCommand({ input: enhanced, files: filesToSend, sessions });
   };
 
   const [interrupting, setInterrupting] = useState(false);

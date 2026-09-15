@@ -17,6 +17,7 @@ import { Copy } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { stripInjectionBlock } from '@renderer/services/memory/memoryInjection';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
 import FilePreview from '@renderer/components/media/FilePreview';
@@ -108,7 +109,10 @@ const MessageText: React.FC<{
   // Filter think tags from content before rendering
   // 在渲染前过滤 think 标签
   const contentToRender = useMemo(() => {
-    let content = message.content.content;
+    // 团队记忆注入块（上下文/协议指令）不进入用户气泡展示（E-15）
+    let content = message.content.content.includes('<!-- aionui-team-context -->')
+      ? stripInjectionBlock(message.content.content)
+      : message.content.content;
     if (typeof content === 'string') {
       if (hasThinkTags(content)) {
         content = stripThinkTags(content);

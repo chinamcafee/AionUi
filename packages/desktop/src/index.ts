@@ -682,6 +682,18 @@ const handleAppReady = async (): Promise<void> => {
   const mark = (label: string) => console.log(`[AionUi:ready] ${label} +${Math.round(performance.now() - t0)}ms`);
   mark('start');
 
+  // Team BFF（团队平台集成）：注册 IPC + OAuth 深链拦截 + 按 config.enabled 启动本地网关（docs/02 M1）
+  try {
+    const { registerTeamIntegration, handleTeamOAuthCallback } = await import('./process/services/teamBff/mainIntegration');
+    const { registerOAuthCallbackHandler } = await import('./process/utils/deepLink');
+    registerOAuthCallbackHandler((url) => {
+      void handleTeamOAuthCallback(url);
+    });
+    await registerTeamIntegration({ getWindow: () => mainWindow });
+  } catch (error) {
+    console.warn('[teamBff] integration disabled:', (error as Error)?.message ?? error);
+  }
+
   if (!app.isPackaged) {
     try {
       const { default: installExtension, REACT_DEVELOPER_TOOLS } = await import('electron-devtools-installer');
@@ -1153,6 +1165,11 @@ installQuitCleanup({
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
   stopBackend: () => backendManager.stop(),
+  // Team BFF：退出时停止本地网关并清理账号运行时（docs/02 M1 / T1.8）
+  stopTeamBff: async () => {
+    const { stopTeamIntegration } = await import('./process/services/teamBff/mainIntegration');
+    await stopTeamIntegration();
+  },
   destroyPetWindow: async () => {
     const { destroyPetWindow } = await import('./process/pet/petManager');
     destroyPetWindow();

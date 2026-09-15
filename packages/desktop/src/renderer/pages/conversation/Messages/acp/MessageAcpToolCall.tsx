@@ -17,6 +17,7 @@ import { createTwoFilesPatch } from 'diff';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import MarkdownView from '@renderer/components/Markdown';
+import { KnowledgeCitationCardList } from '@renderer/components/knowledge/CitationCardList';
 
 const StatusTag: React.FC<{ status: string }> = ({ status }) => {
   const getTagProps = () => {
@@ -78,6 +79,8 @@ const ContentView: React.FC<{ content: IMessageAcpToolCall['content']['update'][
           <div className='overflow-x-auto break-words'>
             <MarkdownView>{content.content.text}</MarkdownView>
           </div>
+          {/* 知识合成工具的结构化引用卡片（无 citations 时渲染为空，M5/T5.5 挂载点） */}
+          <KnowledgeCitationCardList output={content.content.text} />
         </div>
       </div>
     );

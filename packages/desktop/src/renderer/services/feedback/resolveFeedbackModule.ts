@@ -21,6 +21,9 @@ const ROUTE_MODULE_MAP: ReadonlyArray<readonly [prefix: string, tag: FeedbackMod
   ['/team', 'agent-team'],
   ['/scheduled', 'scheduled-task'],
   ['/assistants', 'assistant-preset'],
+  // Team platform pages (enterprise accounts / memory) report as system-level.
+  ['/memory', 'system-settings'],
+  ['/knowledge', 'system-settings'],
   ['/settings/agent', 'agent-detection'],
   ['/settings/model', 'model-auth'],
   ['/settings/skills', 'skills-plugin'],
@@ -31,7 +34,7 @@ const ROUTE_MODULE_MAP: ReadonlyArray<readonly [prefix: string, tag: FeedbackMod
   // Extension-contributed settings tabs are channel plugins (Telegram/Slack/
   // Feishu…) today, so route their reports to the channel module.
   ['/settings/ext', 'channel'],
-  // Remaining settings routes (system, about, unknown future tabs).
+  // Remaining settings routes (system, about, team platform, unknown future tabs).
   ['/settings', 'system-settings'],
 ];
 

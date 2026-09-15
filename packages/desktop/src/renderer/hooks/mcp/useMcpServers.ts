@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ipcBridge } from '@/common';
 import type { IMcpServer } from '@/common/config/storage';
 import { ensureBackendMcpCatalog } from './catalog';
+import { useTeamAuth } from '@/renderer/hooks/context/TeamAuthContext';
+import { KNOWLEDGE_MCP_SERVER_ID } from '@/renderer/services/knowledge/knowledgeMcp';
 
 /**
  * MCP server state hook.
@@ -11,6 +13,14 @@ export const useMcpServers = () => {
   const [mcpServers, setMcpServers] = useState<IMcpServer[]>([]);
   const [extensionMcpServers, setExtensionMcpServers] = useState<IMcpServer[]>([]);
   const [isMcpServersLoading, setIsMcpServersLoading] = useState(true);
+  const { view: teamView } = useTeamAuth();
+
+  // 团队知识内置 server（T5.2/T5.4）：仅团队会话认证且开关开启时合并；
+  // scope 限制说明见 docs/workLog/T5.1（MCP 直连不区分个人/团队可见性，默认通道为 Tool Gateway）。
+  const teamKnowledgeServer = useMemo(() => {
+    if (teamView.phase !== 'authenticated') return null;
+    return buildTeamKnowledgeMcpServer();
+  }, [teamView.phase]);
 
   useEffect(() => {
     void ensureBackendMcpCatalog()
@@ -24,6 +34,8 @@ export const useMcpServers = () => {
       .finally(() => {
         setIsMcpServersLoading(false);
       });
+
+    void ipcBridge.extensions.getMcpServers
 
     void ipcBridge.extensions.getMcpServers
       .invoke()
@@ -62,9 +74,27 @@ export const useMcpServers = () => {
   return {
     mcpServers,
     isMcpServersLoading,
-    allMcpServers: [...mcpServers, ...extensionMcpServers],
+    allMcpServers: teamKnowledgeServer
+      ? [teamKnowledgeServer, ...mcpServers, ...extensionMcpServers]
+      : [...mcpServers, ...extensionMcpServers],
     extensionMcpServers,
     setMcpServers,
     saveMcpServers,
   };
 };
+
+function buildTeamKnowledgeMcpServer(): IMcpServer {
+  const mcpUrl = localStorage.getItem('aionui.team.knowledgeMcpUrl') || 'http://127.0.0.1:30143/mcp';
+  const now = Date.now();
+  return {
+    id: KNOWLEDGE_MCP_SERVER_ID,
+    name: '团队知识库（内置）',
+    description: 'knowledge.query/synthesize/global_search 等 6 工具。注意：MCP 通道不区分个人/团队知识可见性（自托管单用户场景使用）；默认推荐经 Agent 工具网关调用。',
+    enabled: true,
+    transport: { type: 'streamable_http', url: mcpUrl },
+    created_at: now,
+    updated_at: now,
+    original_json: JSON.stringify({ transport: { type: 'streamable_http', url: mcpUrl } }),
+    builtin: true,
+  };
+}

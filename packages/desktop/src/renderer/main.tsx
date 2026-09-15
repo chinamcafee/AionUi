@@ -51,6 +51,7 @@ import type { TFunction } from 'i18next';
 
 // Context providers
 import { AuthProvider } from './hooks/context/AuthContext';
+import { TeamAuthProvider } from './hooks/context/TeamAuthContext';
 import { FeedbackProvider } from './hooks/context/FeedbackContext';
 import { ThemeProvider } from './hooks/context/ThemeContext';
 import { PreviewProvider } from './pages/conversation/Preview/context/PreviewContext';
@@ -301,11 +302,14 @@ const AppProviders: React.FC<PropsWithChildren> = ({ children }) =>
   React.createElement(
     SWRConfig,
     { value: SWR_DEFAULTS },
+  React.createElement(
+    AuthProvider,
+    null,
     React.createElement(
-      AuthProvider,
+      TeamAuthProvider,
       null,
       React.createElement(
-        ThemeProvider,
+      ThemeProvider,
         null,
         React.createElement(
           PreviewProvider,
@@ -323,6 +327,7 @@ const AppProviders: React.FC<PropsWithChildren> = ({ children }) =>
           )
         )
       )
+    )
     )
   );
 

@@ -143,6 +143,11 @@ export default defineConfig(({ mode }) => {
             // Built-in MCP server entry points (compiled by scripts/build-mcp-servers.js via esbuild,
             // not vite — esbuild bundles all deps for self-contained execution by external node processes)
           },
+          external: [
+            // teamBff（团队平台集成）optionalDependency：记忆本地向量模型，缺失时动态 import
+            // 失败并整体降级（上游语义），rollup 不解析、运行时保持可选。
+            '@xenova/transformers',
+          ],
           onwarn(warning, warn) {
             if (warning.code === 'EVAL') return;
             warn(warning);
@@ -216,6 +221,9 @@ export default defineConfig(({ mode }) => {
           '@worker': resolve('packages/desktop/src/process/worker'),
           // Force ESM version of streamdown
           streamdown: resolve('node_modules/streamdown/dist/index.js'),
+          // @jsquash 多线程 worker 编码器与 electron-vite 的 iife worker 不兼容且无法按子路径
+          // alias（包内相对导入）——整体 stub，AVIF 预览降级（T6.2，其余格式不受影响）
+          '@jsquash/avif': resolve('packages/desktop/src/renderer/services/knowledge/jsquashAvifStub.js'),
         },
         extensions: ['.ts', '.tsx', '.js', '.jsx', '.css'],
         // CodeMirror relies on module-level singletons (highlighterFacet, tag
@@ -249,6 +257,9 @@ export default defineConfig(({ mode }) => {
         reportCompressedSize: false,
         chunkSizeWarningLimit: 1500,
         cssCodeSplit: true,
+        // @eternalheart/react-file-preview（知识库预览）传递依赖 @jsquash/* 以 worker 实现，
+        // 默认 iife worker 与代码分割冲突；ES worker 格式与 es2022 target 兼容。
+        worker: { format: 'es' },
         rollupOptions: {
           input: {
             index: resolve(rendererRoot, 'index.html'),

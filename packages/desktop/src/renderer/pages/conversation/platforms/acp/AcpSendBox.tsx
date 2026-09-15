@@ -18,6 +18,8 @@ import { audioExts, getFileExtension, imageExts } from '@/renderer/services/File
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
 import { classifyConfigSetError, useAcpConfigOptions } from '@/renderer/hooks/agent/useAcpConfigOptions';
+import { useMessageList } from '@renderer/pages/conversation/Messages/hooks';
+import { enhanceInputWithTeamMemory, useTeamMemoryTurnExtract, INJECTION_MARK } from '@/renderer/services/memory/memoryInjection';
 import { useAcpModelInfo } from '@/renderer/hooks/agent/useAcpModelInfo';
 import { useAutoTitle } from '@/renderer/hooks/chat/useAutoTitle';
 import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/chat/useSendBoxDraft';
@@ -114,6 +116,8 @@ const AcpSendBox: React.FC<{
   teamSendMessage?: (payload: { input: string; files: ChatFileRef[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
 }> = ({ conversation_id, backend, session_mode, agent_name, messageState, teamSendMessage, teamRuntime }) => {
+  const messages = useMessageList();
+  useTeamMemoryTurnExtract(messages, Boolean(messageState?.running));
   const {
     aiProcessing,
     setAiProcessing,
@@ -282,7 +286,12 @@ const AcpSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files, sessions }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
+    async ({ input: rawInput, files, sessions }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
+      // 团队记忆协议注入（E-15）：收口在 executeCommand——覆盖首条消息（initial）、
+      // 命令队列与常规发送全部路径；INJECTION_MARK 防重复包装。
+      const input = rawInput.includes(INJECTION_MARK)
+        ? rawInput
+        : await enhanceInputWithTeamMemory(rawInput, { messages, conversationMode: session_mode === 'code' ? 'coding' : 'chat' });
       // Plain user text; the backend resolves each ChatFileRef and injects the
       // [[AION_FILES]] marker at the send edge (no front-end path/marker building).
       try {
@@ -457,7 +466,9 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     setSelectedSessions([]);
     emitter.emit('acp.selected.file.clear');
-    await executeCommand({ input: message, files: allFiles, sessions });
+    // 团队记忆注入 + 上一轮抽取（未启用/失败时原样返回，见 services/memory/memoryInjection）
+    const enhanced = await enhanceInputWithTeamMemory(message, { messages, conversationMode: session_mode === 'code' ? 'coding' : 'chat' });
+    await executeCommand({ input: enhanced, files: allFiles, sessions });
   };
 
   const [interrupting, setInterrupting] = useState(false);

@@ -16,6 +16,7 @@ type QuitCleanupDeps = {
   destroyTray: () => void;
   disposeCronResumeListener: () => void;
   stopBackend: () => Promise<void>;
+  stopTeamBff?: () => Promise<void>;
   destroyPetWindow: () => Promise<void> | void;
   logInfo: (message: string) => void;
   logWarn: (message: string) => void;
@@ -56,6 +57,10 @@ async function runQuitCleanup(deps: QuitCleanupDeps): Promise<void> {
     deps.disposeCronResumeListener();
 
     await deps.stopBackend().catch((err) => deps.logError('[App] Failed to stop backend:', err));
+
+    if (deps.stopTeamBff) {
+      await deps.stopTeamBff().catch((err) => deps.logError('[App] Failed to stop team BFF:', err));
+    }
 
     try {
       await deps.destroyPetWindow();

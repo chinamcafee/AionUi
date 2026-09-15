@@ -78,6 +78,25 @@ contextBridge.exposeInMainWorld('__backendStartupBridge', {
   },
 });
 
+// Team BFF（团队平台集成，docs/02 M1）：端口 + 认证/配置 IPC 桥。BFF 未启用时 port 为 0。
+const teamBffPort = ipcRenderer.sendSync('get-team-bff-port') as number;
+contextBridge.exposeInMainWorld('__teamBffPort', teamBffPort > 0 ? teamBffPort : 0);
+contextBridge.exposeInMainWorld('__teamAuthBridge', {
+  getConfig: () => ipcRenderer.invoke('team:config.get'),
+  setConfig: (patch: unknown) => ipcRenderer.invoke('team:config.set', patch),
+  beginLogin: () => ipcRenderer.invoke('team:auth.begin-login'),
+  logout: () => ipcRenderer.invoke('team:auth.logout'),
+  getStatus: () => ipcRenderer.invoke('team:auth.status'),
+  switchTeam: (tenantId: string, teamId: string) => ipcRenderer.invoke('team:auth.switch-team', tenantId, teamId),
+  onStatus: (callback: (view: unknown) => void) => {
+    const handler = (_event: unknown, value: unknown) => callback(value);
+    ipcRenderer.on('team-auth-status', handler);
+    return () => {
+      ipcRenderer.off('team-auth-status', handler);
+    };
+  },
+});
+
 // 托盘事件监听 - 将 IPC 事件转换为 DOM 事件
 // Tray event listeners - convert IPC events to DOM events
 const trayEvents = [

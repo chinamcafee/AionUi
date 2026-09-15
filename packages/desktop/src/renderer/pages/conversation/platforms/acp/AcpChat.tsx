@@ -25,6 +25,7 @@ import { usePendingConfirmationsRecovery } from '@renderer/pages/conversation/Me
 import HOC from '@renderer/utils/ui/HOC';
 import React from 'react';
 import AcpE2EStreamInjector from './AcpE2EStreamInjector';
+import { MemoryConsolidationCard } from '@renderer/components/memory/ConsolidationCard';
 import AcpSendBox from './AcpSendBox';
 import { useAcpMessage } from './useAcpMessage';
 
@@ -94,6 +95,7 @@ const AcpChat: React.FC<{
             <MessageList className='flex-1' emptySlot={emptySlot} />
           </FlexFullContainer>
           <AcpE2EStreamInjector conversationId={conversation_id} />
+                    <MemoryConsolidationCard />
           <ConversationPlanBar conversation_id={conversation_id} />
           {!hideSendBox && (
             <AcpSendBox

@@ -51,6 +51,14 @@ export const parseDeepLinkUrl = (url: string): { action: string; params: Record<
 let mainWindowRef: BrowserWindow | null = null;
 let pendingDeepLinkUrl: string | null = process.argv.find((arg) => arg.startsWith(`${PROTOCOL_SCHEME}://`)) || null;
 
+// Team OAuth 回调（aionui://oauth/callback）拦截器：由 services/teamBff/mainIntegration 注册（T1.7），
+// 在通用 action 分发之前消费，不向 renderer 透出。
+let oauthCallbackHandler: ((url: string) => void) | null = null;
+
+export const registerOAuthCallbackHandler = (handler: ((url: string) => void) | null): void => {
+  oauthCallbackHandler = handler;
+};
+
 export const setDeepLinkMainWindow = (win: BrowserWindow): void => {
   mainWindowRef = win;
 };
@@ -66,6 +74,17 @@ export const clearPendingDeepLinkUrl = (): void => {
  * If the window isn't ready yet, queue it.
  */
 export const handleDeepLinkUrl = (url: string): void => {
+  // aionui://oauth/callback：Team OAuth 回调，交给注册的处理器，不走通用 action 分发
+  try {
+    const probe = new URL(url);
+    if (probe.protocol === `${PROTOCOL_SCHEME}:` && probe.hostname === 'oauth' && probe.pathname === '/callback') {
+      oauthCallbackHandler?.(url);
+      return;
+    }
+  } catch {
+    return;
+  }
+
   const parsed = parseDeepLinkUrl(url);
   if (!parsed) return;
 

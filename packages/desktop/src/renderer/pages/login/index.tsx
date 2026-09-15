@@ -5,6 +5,7 @@ import { changeLanguage } from '@/renderer/services/i18n';
 import { useNavigate } from 'react-router-dom';
 import AppLoader from '@renderer/components/layout/AppLoader';
 import { useAuth } from '../../hooks/context/AuthContext';
+import { useTeamAuth } from '../../hooks/context/TeamAuthContext';
 import './LoginPage.css';
 
 type MessageState = {
@@ -35,6 +36,8 @@ const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { status, login } = useAuth();
+  const { featureEnabled: teamAuthFeatureEnabled, beginLogin: beginTeamLogin } = useTeamAuth();
+  const [teamLoginBusy, setTeamLoginBusy] = React.useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -335,14 +338,40 @@ const LoginPage: React.FC = () => {
           </button>
 
           <div
-            role='alert'
-            aria-live='polite'
+            role="alert"
+            aria-live="polite"
             className={`login-page__message ${message ? 'login-page__message--visible' : ''} ${message ? (message.type === 'success' ? 'login-page__message--success' : 'login-page__message--error') : ''}`}
             hidden={!message}
           >
             {message?.text}
           </div>
         </form>
+
+        {teamAuthFeatureEnabled && (
+          <div className="login-page__team-login" style={{ marginTop: 12, textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+              <span style={{ flex: 1, height: 1, background: 'var(--color-border-2)' }} />
+              <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>或</span>
+              <span style={{ flex: 1, height: 1, background: 'var(--color-border-2)' }} />
+            </div>
+            <button
+              type="button"
+              className="login-page__submit"
+              style={{ background: 'transparent', color: 'var(--color-text-1)', border: '1px solid var(--color-border-2)' }}
+              disabled={teamLoginBusy}
+              onClick={() => {
+                setTeamLoginBusy(true);
+                void beginTeamLogin().finally(() => setTeamLoginBusy(false));
+              }}
+            >
+              <span>{teamLoginBusy ? '正在打开浏览器…' : '使用团队账号登录'}</span>
+            </button>
+            <p style={{ color: 'var(--color-text-3)', fontSize: 12, marginTop: 6 }}>
+              将在系统浏览器中完成安全登录（OAuth），授权后自动返回 AionUi。
+            </p>
+          </div>
+        )}
+
 
         <div className='login-page__footer'>
           <div className='login-page__footer-content'>

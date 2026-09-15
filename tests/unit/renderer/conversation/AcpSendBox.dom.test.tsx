@@ -249,6 +249,8 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', () => ({
 }));
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useAddOrUpdateMessage: () => addOrUpdateMessageMock,
+  // M2 团队记忆注入（T2.9）引入的消息列表读取：测试环境下提供空列表
+  useMessageList: () => [],
 }));
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
   useConversationCommandQueue: (args: unknown) => {

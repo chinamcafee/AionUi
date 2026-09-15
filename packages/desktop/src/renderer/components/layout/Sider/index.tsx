@@ -8,6 +8,8 @@ import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { blurActiveElement } from '@renderer/utils/ui/focus';
 import { useThemeContext } from '@renderer/hooks/context/ThemeContext';
 import { SiderToolbar, SiderSearchEntry, SiderScheduledEntry, SiderAssistantEntry } from './SiderNav';
+import { SiderMemoryEntry, SiderKnowledgeEntry } from './SiderNav/SiderTeamEntries';
+import { useTeamAuth } from '@renderer/hooks/context/TeamAuthContext';
 import SiderFooter from './SiderFooter';
 import TeamSiderSection from './TeamSiderSection';
 import siderStyles from './Sider.module.css';
@@ -27,6 +29,7 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
   const { pathname, search, hash } = location;
 
   const navigate = useNavigate();
+  const { featureEnabled: teamAuthFeatureEnabled } = useTeamAuth();
   const { closePreview, clearPreviewForScope } = usePreviewContext();
   const { logout, status } = useAuth();
   const { theme, setTheme } = useThemeContext();
@@ -216,6 +219,35 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
               siderTooltipProps={siderTooltipProps}
               onClick={handleScheduledClick}
             />
+            {/* 团队空间入口（记忆/知识库）——仅团队功能启用时渲染 */}
+            {teamAuthFeatureEnabled && (
+              <>
+                <SiderMemoryEntry
+                  isMobile={isMobile}
+                  isActive={pathname === '/memory'}
+                  collapsed={collapsed}
+                  siderTooltipProps={siderTooltipProps}
+                  onClick={() => {
+                    cleanupSiderTooltips();
+                    blurActiveElement();
+                    closePreview();
+                    Promise.resolve(navigate('/memory')).catch(() => {});
+                  }}
+                />
+                <SiderKnowledgeEntry
+                  isMobile={isMobile}
+                  isActive={pathname === '/knowledge'}
+                  collapsed={collapsed}
+                  siderTooltipProps={siderTooltipProps}
+                  onClick={() => {
+                    cleanupSiderTooltips();
+                    blurActiveElement();
+                    closePreview();
+                    Promise.resolve(navigate('/knowledge')).catch(() => {});
+                  }}
+                />
+              </>
+            )}
             {/* Divider between fixed top nav and scrollable content area */}
             <div
               className={classNames(
