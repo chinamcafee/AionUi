@@ -35,15 +35,17 @@ export function normalizeAgentRequestOptions(input: {
     sessionMode: input.sessionMode === 'coding' ? 'coding' : 'chat',
     knowledgeEnabled: input.knowledgeEnabled === true,
     knowledgeOrganizerFilter,
-    projectPath: typeof input.projectPath === 'string' && input.projectPath.trim()
-      ? input.projectPath.trim() : null,
+    projectPath: typeof input.projectPath === 'string' && input.projectPath.trim() ? input.projectPath.trim() : null,
     permissionLevel: input.permissionLevel === 'full' ? 'full' : 'sandbox',
   });
 }
 
 export function normalizeKnowledgeOrganizerFilter(value: unknown): KnowledgeOrganizerFilter {
   if (value === undefined || value === null) {
-    return Object.freeze({ groupIds: Object.freeze([]) as unknown as string[], tagIds: Object.freeze([]) as unknown as string[] });
+    return Object.freeze({
+      groupIds: Object.freeze([]) as unknown as string[],
+      tagIds: Object.freeze([]) as unknown as string[],
+    });
   }
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('KNOWLEDGE_FILTER_INVALID');
   const record = value as Record<string, unknown>;
@@ -52,12 +54,16 @@ export function normalizeKnowledgeOrganizerFilter(value: unknown): KnowledgeOrga
   }
   const normalizeIds = (input: unknown, limit: number) => {
     if (!Array.isArray(input)) throw new Error('KNOWLEDGE_FILTER_INVALID');
-    const ids = [...new Set(input.map((item) => {
-      if (typeof item !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(item)) {
-        throw new Error('KNOWLEDGE_FILTER_INVALID');
-      }
-      return item;
-    }))];
+    const ids = [
+      ...new Set(
+        input.map((item) => {
+          if (typeof item !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(item)) {
+            throw new Error('KNOWLEDGE_FILTER_INVALID');
+          }
+          return item;
+        })
+      ),
+    ];
     if (ids.length > limit) throw new Error('KNOWLEDGE_FILTER_INVALID');
     return Object.freeze(ids) as unknown as string[];
   };

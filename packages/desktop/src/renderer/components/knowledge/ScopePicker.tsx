@@ -35,7 +35,7 @@ export const KnowledgeScopePicker: React.FC<{
     const base = teamBffBaseUrl();
     if (!base) throw new Error('TEAM_BFF_UNAVAILABLE');
     const response = await fetch(`${base}/teamapi/knowledge/organizers`, { cache: 'no-store', signal });
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       data?: { groups?: OrganizerItem[]; tags?: OrganizerItem[] };
       error?: { code?: string };
     };
@@ -66,9 +66,15 @@ export const KnowledgeScopePicker: React.FC<{
 
   const content = (
     <Space direction='vertical' size='small' style={{ width: 280 }}>
-      {loading ? <Spin /> : error ? <Typography.Text type='error'>{error}</Typography.Text> : (
+      {loading ? (
+        <Spin />
+      ) : error ? (
+        <Typography.Text type='error'>{error}</Typography.Text>
+      ) : (
         <>
-          <Typography.Text type='secondary' size='small'>分组</Typography.Text>
+          <Typography.Text type='secondary' size='small'>
+            分组
+          </Typography.Text>
           <Select
             size='small'
             mode='multiple'
@@ -78,7 +84,9 @@ export const KnowledgeScopePicker: React.FC<{
             value={value.groupIds}
             onChange={(groupIds) => onChange({ ...value, groupIds: groupIds as string[] })}
           />
-          <Typography.Text type='secondary' size='small'>标签</Typography.Text>
+          <Typography.Text type='secondary' size='small'>
+            标签
+          </Typography.Text>
           <Select
             size='small'
             mode='multiple'
@@ -98,7 +106,11 @@ export const KnowledgeScopePicker: React.FC<{
       <Space size={4} style={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>
         <IconFilter />
         <Typography.Text size='small'>知识范围</Typography.Text>
-        {selectedCount > 0 && <Tag size='small' color='arcoblue'>{selectedCount}</Tag>}
+        {selectedCount > 0 && (
+          <Tag size='small' color='arcoblue'>
+            {selectedCount}
+          </Tag>
+        )}
       </Space>
     </Popover>
   );

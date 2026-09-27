@@ -16,7 +16,7 @@ export interface SafeStorageLike {
 export class SafeStorageRefreshTokenStore {
   constructor(
     private readonly safeStorage: SafeStorageLike,
-    private readonly filePath: string,
+    private readonly filePath: string
   ) {}
 
   private assertEncryptionAvailable() {
@@ -34,7 +34,9 @@ export class SafeStorageRefreshTokenStore {
   private encrypt(raw: string): Buffer {
     try {
       if (this.safeStorage?.isEncryptionAvailable()) return this.safeStorage.encryptString(raw);
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     // 降级：加前缀标记以便解密端识别
     return Buffer.concat([Buffer.from('PLAIN:'), Buffer.from(raw, 'utf8')]);
   }
@@ -71,7 +73,15 @@ export class SafeStorageRefreshTokenStore {
   }
 
   async get(): Promise<string | null> {
-    console.info('[teamAuth:store] get() called, file:', this.filePath, 'exists:', await fs.stat(this.filePath).then(() => true).catch(() => false));
+    console.info(
+      '[teamAuth:store] get() called, file:',
+      this.filePath,
+      'exists:',
+      await fs
+        .stat(this.filePath)
+        .then(() => true)
+        .catch(() => false)
+    );
     this.assertEncryptionAvailable();
     let metadata;
     try {
@@ -92,7 +102,11 @@ export class SafeStorageRefreshTokenStore {
   }
 
   async clear() {
-    console.info('[teamAuth:store] clear() called — THIS DELETES THE TOKEN FILE:', this.filePath, new Error('trace').stack?.split('\n').slice(1,5).join(' | '));
+    console.info(
+      '[teamAuth:store] clear() called — THIS DELETES THE TOKEN FILE:',
+      this.filePath,
+      new Error('trace').stack?.split('\n').slice(1, 5).join(' | ')
+    );
     await fs.rm(this.filePath, { force: true });
   }
 }

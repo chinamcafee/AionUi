@@ -1,7 +1,11 @@
 // T2.9/T2.10：记忆注入/抽取 renderer 侧逻辑单测（无网络：BFF 不可达时降级为原文）。
 
 import { describe, expect, it } from 'vitest';
-import { findLastCompletedExchange, enhanceInputWithTeamMemory, isMemoryInjectionEnabled } from '@/renderer/services/memory/memoryInjection';
+import {
+  findLastCompletedExchange,
+  enhanceInputWithTeamMemory,
+  isMemoryInjectionEnabled,
+} from '@/renderer/services/memory/memoryInjection';
 
 const user = (text: string) => ({ type: 'text', position: 'right', content: { content: text } });
 const assistant = (text: string) => ({ type: 'text', position: 'left', content: { content: text } });

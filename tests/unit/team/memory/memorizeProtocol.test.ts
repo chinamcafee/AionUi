@@ -2,8 +2,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  parseMemorizeBlocks, stripMemorizeBlocks, MEMORIZE_PROTOCOL_DIRECTIVE,
-  INJECTION_MARK, INJECTION_MARK_END, stripInjectionBlock,
+  parseMemorizeBlocks,
+  stripMemorizeBlocks,
+  MEMORIZE_PROTOCOL_DIRECTIVE,
+  INJECTION_MARK,
+  INJECTION_MARK_END,
+  stripInjectionBlock,
 } from '@/renderer/services/memory/memoryInjection';
 import { enhanceInputWithTeamMemory } from '@/renderer/services/memory/memoryInjection';
 
@@ -16,7 +20,13 @@ describe('parseMemorizeBlocks', () => {
     ].join('\n');
     const blocks = parseMemorizeBlocks(text);
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toMatchObject({ audience: 'team', category: 'requirement', scope: 'code', title: '发布规范', content: '发布前需双人复核' });
+    expect(blocks[0]).toMatchObject({
+      audience: 'team',
+      category: 'requirement',
+      scope: 'code',
+      title: '发布规范',
+      content: '发布前需双人复核',
+    });
     expect(blocks[1]).toMatchObject({ audience: 'personal', category: 'fact', title: '个人偏好：深色主题' });
   });
 

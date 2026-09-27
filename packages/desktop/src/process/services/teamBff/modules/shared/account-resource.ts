@@ -7,8 +7,12 @@ export interface AccountResourceSubject {
 const RESOURCE_PATTERN = /^t:([^:]+):tm:([^:]+):team:([^:]+)$/;
 
 export function buildAccountResourceId(subject: AccountResourceSubject): string {
-  if (!subject.tenantId || !subject.tenantMemberId || !subject.activeTeamId ||
-      [subject.tenantId, subject.tenantMemberId, subject.activeTeamId].some((value) => value.includes(':'))) {
+  if (
+    !subject.tenantId ||
+    !subject.tenantMemberId ||
+    !subject.activeTeamId ||
+    [subject.tenantId, subject.tenantMemberId, subject.activeTeamId].some((value) => value.includes(':'))
+  ) {
     throw new Error('ACCOUNT_RESOURCE_SUBJECT_INVALID');
   }
   return `t:${subject.tenantId}:tm:${subject.tenantMemberId}:team:${subject.activeTeamId}`;

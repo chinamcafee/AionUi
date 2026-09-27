@@ -412,6 +412,18 @@
   "imageInputSupported": "設定で有効",
   "imageInputUnsupported": "設定で無効",
   "imageInputTip": "自動判定ではカタログの機能判定を使用します。上書きする場合のみ手動で有効または無効にしてください。",
+  "modelCapability": {
+    "title": "モデル機能",
+    "text": "テキスト",
+    "vision": "ビジョン",
+    "embedding": "埋め込み",
+    "textLabel": "テキストモデル",
+    "textDesc": "会話とテキスト生成",
+    "visionLabel": "視覚理解",
+    "visionDesc": "画像の入力と理解",
+    "embeddingLabel": "埋め込みモデル",
+    "embeddingDesc": "ベクトル検索専用"
+  },
   "openAiApiMode": "OpenAIリクエストAPI",
   "openAiApiModeAuto": "API · 自動",
   "openAiApiModeChatCompletions": "Chat Completions",

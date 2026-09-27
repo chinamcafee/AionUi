@@ -18,31 +18,40 @@ const BARE_CITATION_ID = /\bcite_[A-Za-z0-9_-]{4,128}\b/gi;
  * 思考与正式回答中不应暴露这些标识。流式场景还会截掉尚未闭合的标签前缀。
  */
 export function stripKnowledgeCitationMarkers(text: string): string {
-  let clean = text
-    .replace(RAW_CITATION_TAG, '')
-    .replace(ENCODED_CITATION_TAG, '')
-    .replace(BRACKETED_CITATION, '');
+  let clean = text.replace(RAW_CITATION_TAG, '').replace(ENCODED_CITATION_TAG, '').replace(BRACKETED_CITATION, '');
 
   const partial = clean.match(/(?:<|&lt;)\/?c(?:i(?:t(?:e(?:_[A-Za-z0-9_-]*)?)?)?)?$/i);
   if (partial?.index !== undefined) clean = clean.slice(0, partial.index);
   clean = clean.replace(BARE_CITATION_ID, '');
 
-  return clean
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n');
+  return clean.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
 }
 
 function unwrapKnowledgeOutput(output: unknown): unknown {
   let parsed = output;
   if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { content?: unknown[] }).content)) {
-    const text = (parsed as { content: Array<{ text?: string }> }).content.find((item) => typeof item?.text === 'string')?.text;
+    const text = (parsed as { content: Array<{ text?: string }> }).content.find(
+      (item) => typeof item?.text === 'string'
+    )?.text;
     if (text) {
-      try { parsed = JSON.parse(text); } catch { return null; }
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        return null;
+      }
     }
   } else if (parsed && typeof parsed === 'object' && typeof (parsed as { text?: unknown }).text === 'string') {
-    try { parsed = JSON.parse((parsed as { text: string }).text); } catch { return null; }
+    try {
+      parsed = JSON.parse((parsed as { text: string }).text);
+    } catch {
+      return null;
+    }
   } else if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed); } catch { return null; }
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
   }
   return parsed;
 }
@@ -62,8 +71,11 @@ export function parseKnowledgeCitations(output: unknown): KnowledgeCitation[] {
     result.push({
       docId,
       ...(typeof item.quote === 'string' && item.quote.trim() ? { quote: item.quote.trim() } : {}),
-      ...(typeof item.filename === 'string' && item.filename.trim() ? { title: item.filename.trim() } :
-        typeof item.title === 'string' && item.title.trim() ? { title: item.title.trim() } : {}),
+      ...(typeof item.filename === 'string' && item.filename.trim()
+        ? { title: item.filename.trim() }
+        : typeof item.title === 'string' && item.title.trim()
+          ? { title: item.title.trim() }
+          : {}),
       ...(typeof item.mime === 'string' && item.mime.trim() ? { mime: item.mime.trim() } : {}),
     });
   }
@@ -72,12 +84,16 @@ export function parseKnowledgeCitations(output: unknown): KnowledgeCitation[] {
 
 export function mergeKnowledgeCitations(
   current: readonly KnowledgeCitation[],
-  incoming: readonly KnowledgeCitation[],
+  incoming: readonly KnowledgeCitation[]
 ): KnowledgeCitation[] {
   const merged = new Map<string, KnowledgeCitation>();
   for (const citation of [...current, ...incoming]) {
     if (!DOCUMENT_ID_PATTERN.test(citation.docId)) continue;
-    merged.set(citation.docId.toLowerCase(), { ...merged.get(citation.docId.toLowerCase()), ...citation, docId: citation.docId.toLowerCase() });
+    merged.set(citation.docId.toLowerCase(), {
+      ...merged.get(citation.docId.toLowerCase()),
+      ...citation,
+      docId: citation.docId.toLowerCase(),
+    });
   }
   return [...merged.values()];
 }

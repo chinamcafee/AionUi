@@ -13,5 +13,10 @@
     "specifyWorkspace": "选择项目文件夹",
     "searchPlaceholder": "搜索项目…",
     "noProject": "不使用项目"
+  },
+  "knowledge": {
+    "label": "知识库",
+    "tooltipOn": "知识库已连接：提问会先检索团队知识库，结果作为上下文再交给模型统一处理",
+    "tooltipOff": "开启后，提问会先到 KE-v2 团队知识库做一次问答/提取，并作为参考资料注入本轮对话"
   }
 }

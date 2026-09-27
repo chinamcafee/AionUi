@@ -420,6 +420,18 @@
   "imageInputSupported": "Увімкнено в налаштуваннях",
   "imageInputUnsupported": "Вимкнено в налаштуваннях",
   "imageInputTip": "Автоматичний режим використовує визначення можливостей із каталогу. Вмикайте або вимикайте вручну лише для перевизначення.",
+  "modelCapability": {
+    "title": "Можливості моделі",
+    "text": "Текст",
+    "vision": "Зір",
+    "embedding": "Ембедінг",
+    "textLabel": "Текстова модель",
+    "textDesc": "Діалог і генерація тексту",
+    "visionLabel": "Візуальне розуміння",
+    "visionDesc": "Введення та розуміння зображень",
+    "embeddingLabel": "Модель ембедінгів",
+    "embeddingDesc": "Лише для векторного пошуку"
+  },
   "openAiApiMode": "API запиту OpenAI",
   "openAiApiModeAuto": "API · Авто",
   "openAiApiModeChatCompletions": "Chat Completions",

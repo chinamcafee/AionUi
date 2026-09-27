@@ -1,7 +1,7 @@
 // AionUi 新增：Team BFF 主进程集成（T1.7/T1.8/T1.9）。
 // 注册 IPC（preload 消费）、OAuth 深链回调、BFF 启停（按 config.enabled），状态经 'team-auth-status' 广播。
 
-import { app, ipcMain, safeStorage, shell, type BrowserWindow } from 'electron';
+import { app, ipcMain, powerMonitor, safeStorage, shell, type BrowserWindow } from 'electron';
 import { TeamBffService } from './teamBffService';
 import { startTeamBff, stopTeamBff, teamBffPort, teamBffRunning } from './lifecycle';
 
@@ -73,6 +73,13 @@ export async function registerTeamIntegration(deps: { getWindow: () => BrowserWi
   ipcMain.handle('team:auth.switch-team', async (_event, tenantId: string, teamId: string) => {
     if (!service) throw new Error('TEAM_GATEWAY_UNAVAILABLE');
     return service.switchTeam(tenantId, teamId);
+  });
+
+  // 个人记忆云备份：系统休眠恢复后补一次同步（对齐上游 resume 触发；未激活/未初始化时静默）
+  powerMonitor.on('resume', () => {
+    void import('./modules/personalSync/service')
+      .then((personalSync) => personalSync.runPersonalSync('resume'))
+      .catch(() => {});
   });
 
   await syncServerState().catch((error) => console.warn('[teamBff] startup sync failed:', error?.message ?? error));

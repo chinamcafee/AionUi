@@ -92,7 +92,7 @@ const AionrsChat: React.FC<{
           <FlexFullContainer>
             <MessageList className='flex-1' emptySlot={emptySlot} />
           </FlexFullContainer>
-                    <MemoryConsolidationCard />
+          <MemoryConsolidationCard />
           <ConversationPlanBar conversation_id={conversation_id} />
           <AionrsSendBox
             conversation_id={conversation_id}

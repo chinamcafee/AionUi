@@ -25,7 +25,7 @@ export function isKnowledgeToolName(value: string): value is KnowledgeToolName {
 export function invokeKnowledgeTool<T = unknown>(
   name: KnowledgeToolName,
   input: Record<string, unknown> = {},
-  organizerFilter?: { groupIds: string[]; tagIds: string[] },
+  organizerFilter?: { groupIds: string[]; tagIds: string[] }
 ): Promise<T> {
   return request<T>('/teamapi/agent-tools/invoke', {
     method: 'POST',

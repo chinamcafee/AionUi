@@ -25,20 +25,31 @@ describe('pkce（移植自 client electron/auth/pkce.cjs）', () => {
 
   it('拒绝 zhongshuling:// 旧协议与非法 query', () => {
     const attempt = createPkceAttempt();
-    expect(() => parseAuthorizationCallback(`zhongshuling://oauth/callback?code=${'a'.repeat(64)}&state=${attempt.state}`, attempt.state))
-      .toThrow('AUTH_CALLBACK_INVALID');
-    expect(() => parseAuthorizationCallback(`aionui://oauth/callback?code=${'a'.repeat(64)}&state=${attempt.state}&extra=1`, attempt.state))
-      .toThrow('AUTH_CALLBACK_INVALID');
+    expect(() =>
+      parseAuthorizationCallback(
+        `zhongshuling://oauth/callback?code=${'a'.repeat(64)}&state=${attempt.state}`,
+        attempt.state
+      )
+    ).toThrow('AUTH_CALLBACK_INVALID');
+    expect(() =>
+      parseAuthorizationCallback(
+        `aionui://oauth/callback?code=${'a'.repeat(64)}&state=${attempt.state}&extra=1`,
+        attempt.state
+      )
+    ).toThrow('AUTH_CALLBACK_INVALID');
   });
 
   it('state 不匹配 / error 回调 / code 长度非法 均拒绝', () => {
     const attempt = createPkceAttempt();
     const code = 'b'.repeat(64);
-    expect(() => parseAuthorizationCallback(`aionui://oauth/callback?code=${code}&state=other`, attempt.state))
-      .toThrow('AUTH_CALLBACK_STATE_INVALID');
-    expect(() => parseAuthorizationCallback(`aionui://oauth/callback?error=access_denied&state=${attempt.state}`, attempt.state))
-      .toThrow('AUTHORIZATION_DENIED');
-    expect(() => parseAuthorizationCallback(`aionui://oauth/callback?code=short&state=${attempt.state}`, attempt.state))
-      .toThrow('AUTH_CALLBACK_INVALID');
+    expect(() => parseAuthorizationCallback(`aionui://oauth/callback?code=${code}&state=other`, attempt.state)).toThrow(
+      'AUTH_CALLBACK_STATE_INVALID'
+    );
+    expect(() =>
+      parseAuthorizationCallback(`aionui://oauth/callback?error=access_denied&state=${attempt.state}`, attempt.state)
+    ).toThrow('AUTHORIZATION_DENIED');
+    expect(() =>
+      parseAuthorizationCallback(`aionui://oauth/callback?code=short&state=${attempt.state}`, attempt.state)
+    ).toThrow('AUTH_CALLBACK_INVALID');
   });
 });

@@ -37,7 +37,15 @@ function bootstrap(state: 'ready' | 'team_required', activeTeamId: string | null
       state,
       user: { id: 'u1', email: 'dev@aionui', displayName: 'Dev', avatarUrl: null },
       tenant: { id: T, name: 'AionOrg', tenantMemberId: M, tenantRole: 'tenant_owner', status: 'active' },
-      activeTeam: activeTeamId ? { id: activeTeamId, name: `Team-${activeTeamId.slice(-1)}`, teamMembershipId: 'tm1', roleCode: 'owner', status: 'active' } : null,
+      activeTeam: activeTeamId
+        ? {
+            id: activeTeamId,
+            name: `Team-${activeTeamId.slice(-1)}`,
+            teamMembershipId: 'tm1',
+            roleCode: 'owner',
+            status: 'active',
+          }
+        : null,
       teams: [
         { id: TEAM_A, name: 'Team-A', teamMembershipId: 'tm1', roleCode: 'owner', status: 'active' },
         { id: TEAM_B, name: 'Team-B', teamMembershipId: 'tm2', roleCode: 'member', status: 'active' },
@@ -62,50 +70,121 @@ describe('BFF mock 全链路', () => {
     fetchMock = vi.fn(async (input: any, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/auth/electron/token')) {
-        return new Response(JSON.stringify({ data: {
-          refreshToken: REFRESH, accessToken: ACCESS, deviceId: 'd1',
-          expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(),
-          accessExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
-        } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            data: {
+              refreshToken: REFRESH,
+              accessToken: ACCESS,
+              deviceId: 'd1',
+              expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(),
+              accessExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
       if (url.includes('/auth/electron/refresh')) {
-        return new Response(JSON.stringify({ data: {
-          refreshToken: REFRESH, accessToken: ACCESS, deviceId: 'd1',
-          expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(),
-          accessExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
-        } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            data: {
+              refreshToken: REFRESH,
+              accessToken: ACCESS,
+              deviceId: 'd1',
+              expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString(),
+              accessExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
-      if (url.includes('/session/bootstrap')) return new Response(JSON.stringify(bootstrap('ready', TEAM_A)), { status: 200, headers: { 'content-type': 'application/json' } });
-      if (url.includes('/me/active-team')) return new Response(JSON.stringify({ data: {
-        ...bootstrap('ready', TEAM_B).data,
-        accessToken: ACCESS, accessTokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
-      } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (url.includes('/session/bootstrap'))
+        return new Response(JSON.stringify(bootstrap('ready', TEAM_A)), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      if (url.includes('/me/active-team'))
+        return new Response(
+          JSON.stringify({
+            data: {
+              ...bootstrap('ready', TEAM_B).data,
+              accessToken: ACCESS,
+              accessTokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       if (url.includes('/knowledge/uploads') && !url.includes(':complete')) {
-        return new Response(JSON.stringify({ data: {
-          uploadSession: { id: '018f0000-0000-7000-8000-0000000000a1', documentId: '018f0000-0000-7000-8000-0000000000a2' },
-          upload: { method: 'PUT', url: 'http://127.0.0.1:59000/signed', requiredHeaders: {} },
-        } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            data: {
+              uploadSession: {
+                id: '018f0000-0000-7000-8000-0000000000a1',
+                documentId: '018f0000-0000-7000-8000-0000000000a2',
+              },
+              upload: { method: 'PUT', url: 'http://127.0.0.1:59000/signed', requiredHeaders: {} },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
       if (url.includes(':complete')) {
-        return new Response(JSON.stringify({ data: { status: 'completed', uploadSessionId: '018f0000-0000-7000-8000-0000000000a1', documentId: '018f0000-0000-7000-8000-0000000000a2', ingestionJobId: '018f0000-0000-7000-8000-0000000000b1' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            data: {
+              status: 'completed',
+              uploadSessionId: '018f0000-0000-7000-8000-0000000000a1',
+              documentId: '018f0000-0000-7000-8000-0000000000a2',
+              ingestionJobId: '018f0000-0000-7000-8000-0000000000b1',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
       if (url.includes('/knowledge/jobs/')) {
-        return new Response(JSON.stringify({ data: { status: 'completed', progress: { stage: 'completed', percent: 100, logs: [], result: { chunks: 12, entities: 7, communities: 2 } } } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            data: {
+              status: 'completed',
+              progress: {
+                stage: 'completed',
+                percent: 100,
+                logs: [],
+                result: { chunks: 12, entities: 7, communities: 2 },
+              },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
       if (url.includes('/team-memories') && (init?.method ?? 'GET') === 'POST' && !url.includes(':submit')) {
-        return new Response(JSON.stringify({ data: { id: 'm1', version: { id: '018f0000-0000-7000-8000-0000000000c1' } } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({ data: { id: 'm1', version: { id: '018f0000-0000-7000-8000-0000000000c1' } } }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
       }
       if (url.includes(':submit')) {
-        return new Response(JSON.stringify({ data: { submitted: true } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ data: { submitted: true } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
       if (url.includes('/team-memories')) {
         // team-server 信封 { data: [...] }，BFF 的 callTeamGateway 解包后再包 { memories }
-        return new Response(JSON.stringify({ data: [{ id: 'm1', title: '既有团队记忆', workflowStatus: 'active' }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ data: [{ id: 'm1', title: '既有团队记忆', workflowStatus: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
       if (url.includes('/agent-tools:invoke')) {
-        return new Response(JSON.stringify({ data: { answer: '来自知识库的答案', citations: [] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ data: { answer: '来自知识库的答案', citations: [] } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
-      return new Response(JSON.stringify({ data: { ok: true } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -148,7 +227,11 @@ describe('BFF mock 全链路', () => {
     await service.handleOAuthCallback(`aionui://oauth/callback?code=${code}&state=${state}`);
     expect(service.currentView().authPhase).toBe('authenticated');
     // bootstrap ready → 账号运行时 + 网关配置
-    expect(service.accountRuntime.currentSubject()).toMatchObject({ tenantId: T, tenantMemberId: M, activeTeamId: TEAM_A });
+    expect(service.accountRuntime.currentSubject()).toMatchObject({
+      tenantId: T,
+      tenantMemberId: M,
+      activeTeamId: TEAM_A,
+    });
     expect(service.gateway.isConfigured()).toBe(true);
 
     // ④ 切换团队（generation 失效旧网关 → 新团队生效）
@@ -160,47 +243,85 @@ describe('BFF mock 全链路', () => {
     const json = async (response: Response) => ({ status: response.status, body: await response.json() });
 
     // ⑤ 个人记忆 CRUD
-    const created = await json(await app.request('/teamapi/memories', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: '偏好：简洁回答', content: '用户偏好简洁', category: 'preference', scope: 'chat' }),
-    }));
+    const created = await json(
+      await app.request('/teamapi/memories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: '偏好：简洁回答',
+          content: '用户偏好简洁',
+          category: 'preference',
+          scope: 'chat',
+        }),
+      })
+    );
     expect([200, 201]).toContain(created.status);
     const list = await json(await app.request('/teamapi/memories'));
     expect(list.body.memories.some((m: { title: string }) => m.title.includes('简洁回答'))).toBe(true);
 
     // ⑥ 团队记忆提交（201）与列表
-    const submitted = await json(await app.request('/teamapi/team-memories', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: '发布规范', content: '发布需复核', category: 'requirement', memoryScope: 'chat', tags: ['规范'] }),
-    }));
+    const submitted = await json(
+      await app.request('/teamapi/team-memories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: '发布规范',
+          content: '发布需复核',
+          category: 'requirement',
+          memoryScope: 'chat',
+          tags: ['规范'],
+        }),
+      })
+    );
     expect(submitted.status).toBe(201);
     const teamList = await json(await app.request('/teamapi/team-memories'));
     expect(teamList.body.memories[0].title).toBe('既有团队记忆');
 
     // ⑦ 知识上传 → complete → job 进度（mock 全 completed）
-    const upload = await json(await app.request('/teamapi/knowledge/uploads', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ filename: 'a.pdf', mime: 'application/pdf', sizeBytes: 3, sha256: 'x'.repeat(64), idempotencyKey: '018f0000-0000-7000-8000-0000000000f1' }),
-    }));
+    const upload = await json(
+      await app.request('/teamapi/knowledge/uploads', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          filename: 'a.pdf',
+          mime: 'application/pdf',
+          sizeBytes: 3,
+          sha256: 'x'.repeat(64),
+          idempotencyKey: '018f0000-0000-7000-8000-0000000000f1',
+        }),
+      })
+    );
     expect(upload.body.data.uploadSession.id).toBe('018f0000-0000-7000-8000-0000000000a1');
-    const complete = await json(await app.request('/teamapi/knowledge/uploads/018f0000-0000-7000-8000-0000000000a1/complete', { method: 'POST' }));
+    const complete = await json(
+      await app.request('/teamapi/knowledge/uploads/018f0000-0000-7000-8000-0000000000a1/complete', { method: 'POST' })
+    );
     expect(complete.body.data.ingestionJobId).toBe('018f0000-0000-7000-8000-0000000000b1');
     const job = await json(await app.request('/teamapi/knowledge/jobs/018f0000-0000-7000-8000-0000000000b1'));
     expect(job.body.data.status).toBe('completed');
     expect(job.body.data.progress.result).toMatchObject({ chunks: 12, entities: 7, communities: 2 });
 
     // ⑧ Agent 工具（Tool Gateway 通道）
-    const tool = await json(await app.request('/teamapi/agent-tools/invoke', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'knowledge.synthesize', input: { query: '发布规范是什么' }, organizerFilter: { groupIds: [], tagIds: [] } }),
-    }));
+    const tool = await json(
+      await app.request('/teamapi/agent-tools/invoke', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'knowledge.synthesize',
+          input: { query: '发布规范是什么' },
+          organizerFilter: { groupIds: [], tagIds: [] },
+        }),
+      })
+    );
     expect(tool.body.data.answer).toBe('来自知识库的答案');
 
     // ⑨ 上下文组装（个人通道词法召回 + 云端通道 mock）
-    const context = await json(await app.request('/teamapi/context/assemble', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query: '回答风格偏好', scope: 'chat' }),
-    }));
+    const context = await json(
+      await app.request('/teamapi/context/assemble', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: '回答风格偏好', scope: 'chat' }),
+      })
+    );
     expect(context.status).toBe(200);
     expect(context.body.result).toHaveProperty('personalHits');
     expect(typeof context.body.rendered).toBe('string');
@@ -221,7 +342,7 @@ describe('BFF mock 全链路', () => {
     const app = createTeamBffApp(service);
     const response = await app.request('/teamapi/memories');
     expect(response.status).toBe(409);
-    expect((await response.json() as { error: string }).error).toBe('ACCOUNT_RUNTIME_REQUIRED');
+    expect(((await response.json()) as { error: string }).error).toBe('ACCOUNT_RUNTIME_REQUIRED');
   });
 });
 

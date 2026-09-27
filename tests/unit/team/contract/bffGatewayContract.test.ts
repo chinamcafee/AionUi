@@ -21,7 +21,10 @@ const TEAM = '018f0000-0000-7000-8000-000000000003';
 const BASE = 'http://127.0.0.1:8080';
 const TEAM_BASE = `/api/v1/tenants/${T}/teams/${TEAM}`;
 
-interface CapturedCall { url: string; init: RequestInit }
+interface CapturedCall {
+  url: string;
+  init: RequestInit;
+}
 
 let calls: CapturedCall[];
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -38,7 +41,10 @@ beforeEach(async () => {
     if (last.url.includes('/knowledge/uploads') && !last.url.includes(':complete')) {
       return jsonResponse({
         data: {
-          uploadSession: { id: '018f0000-0000-7000-8000-0000000000a1', documentId: '018f0000-0000-7000-8000-0000000000a2' },
+          uploadSession: {
+            id: '018f0000-0000-7000-8000-0000000000a1',
+            documentId: '018f0000-0000-7000-8000-0000000000a2',
+          },
           upload: { method: 'PUT', url: 'http://127.0.0.1:59000/signed-put', requiredHeaders: {} },
         },
       });
@@ -68,8 +74,13 @@ describe('知识上传契约（T4.3 路由 → team-server）', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        filename: 'a.pdf', mime: 'application/pdf', sizeBytes: 3, sha256: 'x'.repeat(64),
-        visibility: 'team', classification: 'internal', idempotencyKey: '018f0000-0000-7000-8000-0000000000ff',
+        filename: 'a.pdf',
+        mime: 'application/pdf',
+        sizeBytes: 3,
+        sha256: 'x'.repeat(64),
+        visibility: 'team',
+        classification: 'internal',
+        idempotencyKey: '018f0000-0000-7000-8000-0000000000ff',
       }),
     });
     expect(response.status).toBe(200);
@@ -79,7 +90,12 @@ describe('知识上传契约（T4.3 路由 → team-server）', () => {
     expect(headers(call.init).get('Authorization')).toBe(`Bearer ${TOKEN}`);
     expect(headers(call.init).get('Idempotency-Key')).toBe('018f0000-0000-7000-8000-0000000000ff');
     const body = JSON.parse(String(call.init.body));
-    expect(body).toMatchObject({ filename: 'a.pdf', sha256: 'x'.repeat(64), visibility: 'team', classification: 'internal' });
+    expect(body).toMatchObject({
+      filename: 'a.pdf',
+      sha256: 'x'.repeat(64),
+      visibility: 'team',
+      classification: 'internal',
+    });
   });
 
   it('complete/retry/cancel 命中 `:action` 形状路径', async () => {
@@ -99,13 +115,20 @@ describe('Agent 工具契约（T5.3）', () => {
     const response = await app.request('/agent-tools/invoke', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'knowledge.query', input: { query: '产品指标' }, organizerFilter: { groupIds: ['g1'], tagIds: [] } }),
+      body: JSON.stringify({
+        name: 'knowledge.query',
+        input: { query: '产品指标' },
+        organizerFilter: { groupIds: ['g1'], tagIds: [] },
+      }),
     });
     expect(response.status).toBe(200);
     const call = calls[0];
     expect(call.url).toBe(`${BASE}${TEAM_BASE}/knowledge/agent-tools:invoke`);
     const body = JSON.parse(String(call.init.body));
-    expect(body).toEqual({ name: 'knowledge.query', input: { query: '产品指标', organizerFilter: { groupIds: ['g1'], tagIds: [] } } });
+    expect(body).toEqual({
+      name: 'knowledge.query',
+      input: { query: '产品指标', organizerFilter: { groupIds: ['g1'], tagIds: [] } },
+    });
   });
 });
 
@@ -123,13 +146,21 @@ describe('团队记忆契约（T3.2）', () => {
     const response = await app.request('/team-memories', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: '发布规范', content: '所有发布需二人复核', category: 'requirement', memoryScope: 'chat', tags: ['规范'] }),
+      body: JSON.stringify({
+        title: '发布规范',
+        content: '所有发布需二人复核',
+        category: 'requirement',
+        memoryScope: 'chat',
+        tags: ['规范'],
+      }),
     });
     expect(response.status).toBe(201);
     expect(calls[0].url).toBe(`${BASE}${TEAM_BASE}/team-memories`);
     expect(headers(calls[0].init).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
     expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
-      title: '发布规范', memoryScope: 'chat', source: { type: 'manual' },
+      title: '发布规范',
+      memoryScope: 'chat',
+      source: { type: 'manual' },
     });
     expect(calls[1].url).toBe(`${BASE}${TEAM_BASE}/team-memory-versions/018f0000-0000-7000-8000-0000000000c1:submit`);
   });

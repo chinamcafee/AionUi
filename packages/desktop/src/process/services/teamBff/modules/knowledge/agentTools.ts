@@ -21,8 +21,10 @@ export const KNOWLEDGE_AGENT_TOOLS = Object.freeze([
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function knowledgeGatewayError(error: unknown) {
-  const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,100}$/.test(error.message)
-    ? error.message : 'TEAM_GATEWAY_UPSTREAM_FAILED';
+  const code =
+    error instanceof Error && /^[A-Z][A-Z0-9_]{2,100}$/.test(error.message)
+      ? error.message
+      : 'TEAM_GATEWAY_UPSTREAM_FAILED';
   return { code, status: code === 'TEAM_GATEWAY_UNAVAILABLE' ? 409 : 502 } as const;
 }
 
@@ -39,19 +41,29 @@ export function createAgentToolsRoutes() {
 
   app.post('/agent-tools/invoke', async (c) => {
     if (!hasActiveAccount()) return c.json({ error: { code: 'ACCOUNT_RUNTIME_REQUIRED' } }, 409);
-    const body = await c.req.json().catch(() => null) as {
-      name?: unknown; input?: unknown; organizerFilter?: unknown;
+    const body = (await c.req.json().catch(() => null)) as {
+      name?: unknown;
+      input?: unknown;
+      organizerFilter?: unknown;
     } | null;
-    if (!body || typeof body.name !== 'string' || !KNOWLEDGE_AGENT_TOOLS.includes(body.name) ||
-        (body.input !== undefined && (typeof body.input !== 'object' || body.input === null))) {
+    if (
+      !body ||
+      typeof body.name !== 'string' ||
+      !KNOWLEDGE_AGENT_TOOLS.includes(body.name) ||
+      (body.input !== undefined && (typeof body.input !== 'object' || body.input === null))
+    ) {
       return c.json({ error: { code: 'VALIDATION_ERROR' } }, 400);
     }
     // organizerFilter（分组/标签范围）由调用端传入，服务端强制随工具透传（上游语义）
-    const input = { ...(typeof body.input === 'object' && body.input ? body.input as Record<string, unknown> : {}) };
+    const input = { ...(typeof body.input === 'object' && body.input ? (body.input as Record<string, unknown>) : {}) };
     const filter = body.organizerFilter;
     if (filter !== undefined) {
-      if (typeof filter !== 'object' || filter === null || Array.isArray(filter) ||
-          Object.keys(filter).some((key) => key !== 'groupIds' && key !== 'tagIds')) {
+      if (
+        typeof filter !== 'object' ||
+        filter === null ||
+        Array.isArray(filter) ||
+        Object.keys(filter).some((key) => key !== 'groupIds' && key !== 'tagIds')
+      ) {
         return c.json({ error: { code: 'KNOWLEDGE_FILTER_INVALID' } }, 400);
       }
       input.organizerFilter = filter;
@@ -64,7 +76,7 @@ export function createAgentToolsRoutes() {
           method: 'POST',
           body: JSON.stringify({ name: body.name, input }),
           signal: AbortSignal.any([c.req.raw.signal, accountRuntime.signal()]),
-        },
+        }
       );
       return c.json({ data });
     } catch (error) {

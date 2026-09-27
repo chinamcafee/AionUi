@@ -42,8 +42,10 @@ export function useUploadProgress(jobId: string | null, pollGeneration = 0) {
       try {
         const base = teamBffBaseUrl();
         if (!base) throw new Error('TEAM_BFF_UNAVAILABLE');
-        const response = await fetch(`${base}/teamapi/knowledge/jobs/${encodeURIComponent(jobId)}`, { cache: 'no-store' });
-        const payload = await response.json().catch(() => ({})) as {
+        const response = await fetch(`${base}/teamapi/knowledge/jobs/${encodeURIComponent(jobId)}`, {
+          cache: 'no-store',
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
           data?: {
             status?: string;
             failureCode?: string | null;
@@ -66,15 +68,18 @@ export function useUploadProgress(jobId: string | null, pollGeneration = 0) {
         if (serverProgress) {
           const logs = Array.isArray(serverProgress.logs) ? serverProgress.logs : [];
           setProgress(logs);
-          if (typeof serverProgress.percent === 'number') setPercent(Math.max(0, Math.min(100, serverProgress.percent)));
+          if (typeof serverProgress.percent === 'number')
+            setPercent(Math.max(0, Math.min(100, serverProgress.percent)));
           if (serverProgress.stage) setStage(serverProgress.stage);
           if (serverProgress.result) setDoneStats(serverProgress.result);
         }
         if (state !== lastState && (!serverProgress?.logs || serverProgress.logs.length === 0)) {
           lastState = state;
           const labels: Record<string, string> = {
-            queued: '等待 KE-v2 接收任务', retry_wait: '摄入服务暂不可用，等待自动重试',
-            running: 'KE-v2 正在拆解、抽取并建立索引', completed: '文档解析和索引已完成',
+            queued: '等待 KE-v2 接收任务',
+            retry_wait: '摄入服务暂不可用，等待自动重试',
+            running: 'KE-v2 正在拆解、抽取并建立索引',
+            completed: '文档解析和索引已完成',
           };
           setProgress((items) => [...items, { stage: state, detail: labels[state] ?? state, ts: Date.now() }]);
           setStage(state);
@@ -86,8 +91,12 @@ export function useUploadProgress(jobId: string | null, pollGeneration = 0) {
           return;
         }
         if (state === 'failed' || state === 'cancelled') {
-          const progressError = [...(serverProgress?.logs ?? [])].reverse().find((entry) => entry.outcome === 'failed')?.detail;
-          setErrorMsg(progressError ?? payload.data.failureCode ?? (state === 'cancelled' ? '任务已终止' : '摄入任务失败'));
+          const progressError = [...(serverProgress?.logs ?? [])]
+            .toReversed()
+            .find((entry) => entry.outcome === 'failed')?.detail;
+          setErrorMsg(
+            progressError ?? payload.data.failureCode ?? (state === 'cancelled' ? '任务已终止' : '摄入任务失败')
+          );
           setStatus(state === 'cancelled' ? 'cancelled' : 'failed');
           return;
         }

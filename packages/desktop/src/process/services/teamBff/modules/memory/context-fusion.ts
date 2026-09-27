@@ -26,8 +26,12 @@ function buildTextFingerprint(text: string): number[] {
 }
 
 export type ContextSemanticType =
-  | 'team_policy' | 'personal_requirement' | 'team_fact'
-  | 'personal_preference' | 'personal_fact' | 'knowledge';
+  | 'team_policy'
+  | 'personal_requirement'
+  | 'team_fact'
+  | 'personal_preference'
+  | 'personal_fact'
+  | 'knowledge';
 
 export interface FusedContextHit extends ContextHit {
   semanticType: ContextSemanticType;
@@ -86,21 +90,23 @@ function normalizedByKind(hits: ContextHit[]) {
   for (const hit of hits) groups.set(hit.kind, [...(groups.get(hit.kind) ?? []), hit]);
   const scores = new Map<string, number>();
   for (const group of groups.values()) {
-    const sorted = [...group].sort((left, right) => right.score - left.score);
+    const sorted = [...group].toSorted((left, right) => right.score - left.score);
     const min = Math.min(...sorted.map((hit) => hit.score));
     const max = Math.max(...sorted.map((hit) => hit.score));
-    sorted.forEach((hit, index) => scores.set(hit.id, max > min
-      ? (hit.score - min) / (max - min)
-      : 1 - (index / Math.max(1, sorted.length)) * 0.25));
+    sorted.forEach((hit, index) =>
+      scores.set(hit.id, max > min ? (hit.score - min) / (max - min) : 1 - (index / Math.max(1, sorted.length)) * 0.25)
+    );
   }
   return scores;
 }
 
 function better(left: FusedContextHit, right: FusedContextHit) {
-  return sourcePriority[left.kind] - sourcePriority[right.kind] ||
+  return (
+    sourcePriority[left.kind] - sourcePriority[right.kind] ||
     priority[left.semanticType] - priority[right.semanticType] ||
     Number(left.mandatory) - Number(right.mandatory) ||
-    left.normalizedScore - right.normalizedScore;
+    left.normalizedScore - right.normalizedScore
+  );
 }
 
 function negated(text: string) {
@@ -124,7 +130,7 @@ export function contextBudget(contextWindow: number, includeKnowledge: boolean):
   return {
     contextWindow: window,
     personal: Math.floor(window * 0.15),
-    team: Math.floor(window * 0.20),
+    team: Math.floor(window * 0.2),
     knowledge: includeKnowledge ? Math.floor(window * 0.25) : 0,
   };
 }
@@ -142,7 +148,7 @@ function exactAndSemanticDedupe(hits: FusedContextHit[]) {
   }
   const selected: FusedContextHit[] = [];
   const vectors = new Map<string, number[]>();
-  for (const candidate of [...exact.values()].sort((left, right) => better(right, left))) {
+  for (const candidate of [...exact.values()].toSorted((left, right) => better(right, left))) {
     const vector = buildTextFingerprint(canonicalText(candidate));
     const duplicate = selected.find((hit) => {
       if (negated(hit.text) !== negated(candidate.text)) return false;
@@ -158,11 +164,16 @@ function exactAndSemanticDedupe(hits: FusedContextHit[]) {
   for (let index = 0; index < selected.length; index += 1) {
     const hit = selected[index]!;
     const vector = vectors.get(hit.id)!;
-    const conflict = selected.slice(0, index).find((higher) =>
-      negated(higher.text) !== negated(hit.text) &&
-      cosineSimilarity(vectors.get(higher.id)!, vector) >= 0.72 &&
-      (sourcePriority[higher.kind] > sourcePriority[hit.kind] ||
-        (sourcePriority[higher.kind] === sourcePriority[hit.kind] && priority[higher.semanticType] > priority[hit.semanticType])));
+    const conflict = selected
+      .slice(0, index)
+      .find(
+        (higher) =>
+          negated(higher.text) !== negated(hit.text) &&
+          cosineSimilarity(vectors.get(higher.id)!, vector) >= 0.72 &&
+          (sourcePriority[higher.kind] > sourcePriority[hit.kind] ||
+            (sourcePriority[higher.kind] === sourcePriority[hit.kind] &&
+              priority[higher.semanticType] > priority[hit.semanticType]))
+      );
     if (conflict) hit.conflictsWith = conflict.id;
   }
   return selected;
@@ -170,7 +181,7 @@ function exactAndSemanticDedupe(hits: FusedContextHit[]) {
 
 export function fuseAndBudgetContext(
   result: ParallelContextResult,
-  options: { contextWindow?: number; includeKnowledge?: boolean } = {},
+  options: { contextWindow?: number; includeKnowledge?: boolean } = {}
 ): FusedContextResult {
   const all = [
     ...result.personalHits,
@@ -189,13 +200,12 @@ export function fuseAndBudgetContext(
       estimatedTokens: estimateContextTokens(`${hit.title}\n${hit.text}`),
     };
   });
-  const deduped = exactAndSemanticDedupe(prepared).sort((left, right) => better(right, left));
+  const deduped = exactAndSemanticDedupe(prepared).toSorted((left, right) => better(right, left));
   const budget = contextBudget(options.contextWindow ?? resolveContextWindow(), options.includeKnowledge !== false);
   const usedTokens = { personal: 0, team: 0, knowledge: 0 };
   const selected: FusedContextHit[] = [];
   for (const hit of deduped) {
-    const bucket = hit.kind === 'personal_memory' ? 'personal'
-      : hit.kind === 'team_memory' ? 'team' : 'knowledge';
+    const bucket = hit.kind === 'personal_memory' ? 'personal' : hit.kind === 'team_memory' ? 'team' : 'knowledge';
     const mustKeep = hit.semanticType === 'team_policy' || hit.semanticType === 'personal_requirement';
     if (!mustKeep && usedTokens[bucket] + hit.estimatedTokens > budget[bucket]) continue;
     selected.push(hit);
@@ -222,11 +232,22 @@ export function renderFusedContext(result: FusedContextResult): string {
     if (lines.length > 0) lines.push('');
     lines.push(heading);
     for (const hit of hits) {
-      const prefix = hit.kind === 'personal_memory' ? `P:${hit.sourceId}@${hit.version}`
-        : hit.kind === 'team_memory' ? `T:${hit.sourceId}@${hit.version}` : `K:${hit.sourceId}`;
-      const flags = [hit.semanticType === 'team_policy' ? 'policy' : '', hit.conflictsWith ? `conflicts:${hit.conflictsWith}` : '']
-        .filter(Boolean).map((flag) => `[${flag}]`).join('');
-      lines.push(`- [${prefix}]${flags} ${hit.title ? `${hit.title}：` : ''}${hit.text}${hit.viaGraph ? `（${hit.viaGraph}）` : ''}`);
+      const prefix =
+        hit.kind === 'personal_memory'
+          ? `P:${hit.sourceId}@${hit.version}`
+          : hit.kind === 'team_memory'
+            ? `T:${hit.sourceId}@${hit.version}`
+            : `K:${hit.sourceId}`;
+      const flags = [
+        hit.semanticType === 'team_policy' ? 'policy' : '',
+        hit.conflictsWith ? `conflicts:${hit.conflictsWith}` : '',
+      ]
+        .filter(Boolean)
+        .map((flag) => `[${flag}]`)
+        .join('');
+      lines.push(
+        `- [${prefix}]${flags} ${hit.title ? `${hit.title}：` : ''}${hit.text}${hit.viaGraph ? `（${hit.viaGraph}）` : ''}`
+      );
     }
   }
   if (result.degraded.length > 0) lines.push('', `<!-- context-degraded:${result.degraded.join(',')} -->`);

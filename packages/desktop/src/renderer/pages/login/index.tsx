@@ -338,8 +338,8 @@ const LoginPage: React.FC = () => {
           </button>
 
           <div
-            role="alert"
-            aria-live="polite"
+            role='alert'
+            aria-live='polite'
             className={`login-page__message ${message ? 'login-page__message--visible' : ''} ${message ? (message.type === 'success' ? 'login-page__message--success' : 'login-page__message--error') : ''}`}
             hidden={!message}
           >
@@ -348,16 +348,20 @@ const LoginPage: React.FC = () => {
         </form>
 
         {teamAuthFeatureEnabled && (
-          <div className="login-page__team-login" style={{ marginTop: 12, textAlign: 'center' }}>
+          <div className='login-page__team-login' style={{ marginTop: 12, textAlign: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
               <span style={{ flex: 1, height: 1, background: 'var(--color-border-2)' }} />
               <span style={{ color: 'var(--color-text-3)', fontSize: 12 }}>或</span>
               <span style={{ flex: 1, height: 1, background: 'var(--color-border-2)' }} />
             </div>
             <button
-              type="button"
-              className="login-page__submit"
-              style={{ background: 'transparent', color: 'var(--color-text-1)', border: '1px solid var(--color-border-2)' }}
+              type='button'
+              className='login-page__submit'
+              style={{
+                background: 'transparent',
+                color: 'var(--color-text-1)',
+                border: '1px solid var(--color-border-2)',
+              }}
               disabled={teamLoginBusy}
               onClick={() => {
                 setTeamLoginBusy(true);
@@ -371,7 +375,6 @@ const LoginPage: React.FC = () => {
             </p>
           </div>
         )}
-
 
         <div className='login-page__footer'>
           <div className='login-page__footer-content'>

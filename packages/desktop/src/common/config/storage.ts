@@ -514,8 +514,16 @@ export type ModelOpenAiApiMode = 'chat_completions' | 'responses';
 export type ModelImageInputCapability = 'supported' | 'unsupported';
 
 export type ModelSettings = {
+  /** 知识引擎嵌入模型标记 */
+  is_embedding?: boolean;
   image_input?: ModelImageInputCapability;
   openai_api_mode?: ModelOpenAiApiMode;
+  /**
+   * 该模型的显式能力列表（text/vision/embedding 等）。
+   * 存在即表示用户已手动配置；缺省时 UI 回退到默认能力状态。
+   * Explicit per-model capability list. Presence means user-configured.
+   */
+  capabilities?: ModelType[];
 };
 
 export interface IProvider {

@@ -684,7 +684,8 @@ const handleAppReady = async (): Promise<void> => {
 
   // Team BFF（团队平台集成）：注册 IPC + OAuth 深链拦截 + 按 config.enabled 启动本地网关（docs/02 M1）
   try {
-    const { registerTeamIntegration, handleTeamOAuthCallback } = await import('./process/services/teamBff/mainIntegration');
+    const { registerTeamIntegration, handleTeamOAuthCallback } =
+      await import('./process/services/teamBff/mainIntegration');
     const { registerOAuthCallbackHandler } = await import('./process/utils/deepLink');
     registerOAuthCallbackHandler((url) => {
       void handleTeamOAuthCallback(url);

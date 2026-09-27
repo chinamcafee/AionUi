@@ -417,6 +417,18 @@
   "imageInputSupported": "Включено в настройках",
   "imageInputUnsupported": "Отключено в настройках",
   "imageInputTip": "Автоматический режим использует определение возможностей из каталога. Включайте или отключайте вручную только для переопределения.",
+  "modelCapability": {
+    "title": "Возможности модели",
+    "text": "Текст",
+    "vision": "Зрение",
+    "embedding": "Эмбеддинг",
+    "textLabel": "Текстовая модель",
+    "textDesc": "Диалог и генерация текста",
+    "visionLabel": "Визуальное понимание",
+    "visionDesc": "Ввод и понимание изображений",
+    "embeddingLabel": "Модель эмбеддингов",
+    "embeddingDesc": "Только для векторного поиска"
+  },
   "openAiApiMode": "API запроса OpenAI",
   "openAiApiModeAuto": "API · Авто",
   "openAiApiModeChatCompletions": "Chat Completions",

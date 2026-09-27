@@ -45,9 +45,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const CANDIDATE_MIN_AGE_DAYS = 30;
 
 /** salience = min(1, max(分类先验, importance) + min(0.2, recallCount×0.02)) */
-export function salienceOf(
-  memory: Pick<MemoryEntry, 'category' | 'importance' | 'recallCount'>,
-): number {
+export function salienceOf(memory: Pick<MemoryEntry, 'category' | 'importance' | 'recallCount'>): number {
   const base = Math.max(CATEGORY_SALIENCE[memory.category] ?? 0.5, memory.importance);
   return Math.min(1, base + Math.min(0.2, memory.recallCount * 0.02));
 }
@@ -59,7 +57,7 @@ export function salienceOf(
 export function retentionOf(
   memory: Pick<MemoryEntry, 'category' | 'importance' | 'recallCount' | 'updatedAt' | 'lastRecalledAt'>,
   accessAts: number[] = [],
-  now = Date.now(),
+  now = Date.now()
 ): number {
   const reference = Math.max(memory.updatedAt, memory.lastRecalledAt ?? 0);
   const deltaDays = Math.max(0, (now - reference) / DAY_MS);
@@ -95,15 +93,16 @@ export interface RetentionCandidate {
 export function buildRetentionCandidates(
   entries: MemoryEntry[],
   accessLogs: ReadonlyMap<string, number[]>,
-  now = Date.now(),
+  now = Date.now()
 ): RetentionCandidate[] {
   const candidates: RetentionCandidate[] = [];
   for (const entry of entries) {
     if (entry.pinned) continue;
     const retention = retentionOf(entry, accessLogs.get(entry.id) ?? [], now);
-    const coldUnused = retention < RETENTION.coldThreshold
-      && entry.recallCount === 0
-      && now - entry.createdAt > CANDIDATE_MIN_AGE_DAYS * DAY_MS;
+    const coldUnused =
+      retention < RETENTION.coldThreshold &&
+      entry.recallCount === 0 &&
+      now - entry.createdAt > CANDIDATE_MIN_AGE_DAYS * DAY_MS;
     const floored = entry.importance <= CONSOLIDATED_IMPORTANCE_FLOOR + 1e-9;
     if (!coldUnused && !floored) continue;
     candidates.push({

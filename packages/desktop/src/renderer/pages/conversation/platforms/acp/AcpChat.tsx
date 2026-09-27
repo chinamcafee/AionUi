@@ -95,7 +95,7 @@ const AcpChat: React.FC<{
             <MessageList className='flex-1' emptySlot={emptySlot} />
           </FlexFullContainer>
           <AcpE2EStreamInjector conversationId={conversation_id} />
-                    <MemoryConsolidationCard />
+          <MemoryConsolidationCard />
           <ConversationPlanBar conversation_id={conversation_id} />
           {!hideSendBox && (
             <AcpSendBox

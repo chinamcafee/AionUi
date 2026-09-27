@@ -72,10 +72,22 @@ const iconProps = {
 
 export const SiderMemoryEntry: React.FC<SiderTeamEntryProps> = (props) => {
   const { t } = useTranslation();
-  return <SiderTeamEntry {...props} icon={<Brain {...iconProps} />} label={t('teamWorkspace.memory', { defaultValue: '记忆' })} />;
+  return (
+    <SiderTeamEntry
+      {...props}
+      icon={<Brain {...iconProps} />}
+      label={t('teamWorkspace.memory', { defaultValue: '记忆' })}
+    />
+  );
 };
 
 export const SiderKnowledgeEntry: React.FC<SiderTeamEntryProps> = (props) => {
   const { t } = useTranslation();
-  return <SiderTeamEntry {...props} icon={<Bookshelf {...iconProps} />} label={t('teamWorkspace.knowledge', { defaultValue: '知识库' })} />;
+  return (
+    <SiderTeamEntry
+      {...props}
+      icon={<Bookshelf {...iconProps} />}
+      label={t('teamWorkspace.knowledge', { defaultValue: '知识库' })}
+    />
+  );
 };

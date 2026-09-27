@@ -29,7 +29,7 @@ interface FeatureExtractionTensor {
 }
 type FeatureExtractor = (
   input: string[],
-  options: { pooling: 'mean'; normalize: true },
+  options: { pooling: 'mean'; normalize: true }
 ) => Promise<FeatureExtractionTensor>;
 
 // 懒加载单例：并发调用共享同一个 Promise（并发去重）；失败时重置，允许后续重试。
@@ -112,10 +112,10 @@ export function createCloudEmbeddingProvider(config: CloudEmbeddingConfig): Memo
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`CLOUD_EMBEDDING_HTTP_${response.status}`);
-    const payload = await response.json() as { data?: Array<{ index?: number; embedding?: number[] }> };
+    const payload = (await response.json()) as { data?: Array<{ index?: number; embedding?: number[] }> };
     const data = Array.isArray(payload.data) ? payload.data : [];
     if (data.length !== texts.length) throw new Error('CLOUD_EMBEDDING_COUNT_MISMATCH');
-    const ordered = [...data].sort((left, right) => (left.index ?? 0) - (right.index ?? 0));
+    const ordered = [...data].toSorted((left, right) => (left.index ?? 0) - (right.index ?? 0));
     return ordered.map((item) => Float32Array.from(item.embedding ?? []));
   };
   return {
@@ -150,7 +150,7 @@ export function withDimensionGuard(provider: MemoryEmbeddingProvider): MemoryEmb
   const assertDimensions = (vector: Float32Array): Float32Array => {
     if (vector.length !== provider.dimensions) {
       throw new Error(
-        `EMBEDDING_DIMENSION_MISMATCH provider=${provider.name} expected=${provider.dimensions} actual=${vector.length}`,
+        `EMBEDDING_DIMENSION_MISMATCH provider=${provider.name} expected=${provider.dimensions} actual=${vector.length}`
       );
     }
     return vector;
@@ -174,7 +174,9 @@ export function withDimensionGuard(provider: MemoryEmbeddingProvider): MemoryEmb
 export async function resolveEmbeddingProvider(): Promise<MemoryEmbeddingProvider | null> {
   // 显式 cloud 配置优先于 local（即使在 VITEST 环境：显式注入视为有意为之）；resolver 异常等同无配置
   const cloudConfig = cloudConfigResolver
-    ? await Promise.resolve().then(() => cloudConfigResolver!()).catch(() => null)
+    ? await Promise.resolve()
+        .then(() => cloudConfigResolver!())
+        .catch(() => null)
     : null;
   if (cloudConfig) return withDimensionGuard(createCloudEmbeddingProvider(cloudConfig));
   // 测试环境禁止真实加载模型（避免下载）；测试经 setMemoryEmbeddingQueueHooks / setMemorySearchHooks 注入 fake provider
@@ -250,18 +252,20 @@ function drainEmbeddingQueue(): Promise<void> {
 
 async function processEmbeddingBatchWithRetry(
   provider: MemoryEmbeddingProvider,
-  batch: Array<[string, string]>,
+  batch: Array<[string, string]>
 ): Promise<void> {
   const texts = batch.map(([, text]) => text);
   for (let attempt = 0; attempt <= EMBEDDING_QUEUE_MAX_RETRIES; attempt += 1) {
     try {
       const vectors = await provider.embedBatch(texts);
-      const results = batch.map(([memoryId], index): MemoryEmbeddingVectorResult => ({
-        memoryId,
-        vector: vectors[index],
-        provider: provider.name,
-        dimensions: provider.dimensions,
-      }));
+      const results = batch.map(
+        ([memoryId], index): MemoryEmbeddingVectorResult => ({
+          memoryId,
+          vector: vectors[index],
+          provider: provider.name,
+          dimensions: provider.dimensions,
+        })
+      );
       for (const [memoryId] of batch) embeddingRetryCounts.delete(memoryId);
       await queueHooks.onEmbedded?.(results);
       return;

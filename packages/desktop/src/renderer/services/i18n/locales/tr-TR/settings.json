@@ -412,6 +412,18 @@
   "imageInputSupported": "Yapılandırmayla etkin",
   "imageInputUnsupported": "Yapılandırmayla devre dışı",
   "imageInputTip": "Otomatik mod katalogdaki yetenek algılamasını kullanır. Yalnızca geçersiz kılmak için elle etkinleştirin veya devre dışı bırakın.",
+  "modelCapability": {
+    "title": "Model Yetenekleri",
+    "text": "Metin",
+    "vision": "Görsel",
+    "embedding": "Gömme",
+    "textLabel": "Metin Modeli",
+    "textDesc": "Sohbet ve metin üretimi",
+    "visionLabel": "Görsel Anlama",
+    "visionDesc": "Görsel girişi ve anlama",
+    "embeddingLabel": "Gömme Modeli",
+    "embeddingDesc": "Yalnızca vektör arama için"
+  },
   "openAiApiMode": "OpenAI istek API'si",
   "openAiApiModeAuto": "API · Otomatik",
   "openAiApiModeChatCompletions": "Chat Completions",

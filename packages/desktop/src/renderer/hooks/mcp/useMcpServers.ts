@@ -35,7 +35,7 @@ export const useMcpServers = () => {
         setIsMcpServersLoading(false);
       });
 
-    void ipcBridge.extensions.getMcpServers
+    void ipcBridge.extensions.getMcpServers;
 
     void ipcBridge.extensions.getMcpServers
       .invoke()
@@ -89,7 +89,8 @@ function buildTeamKnowledgeMcpServer(): IMcpServer {
   return {
     id: KNOWLEDGE_MCP_SERVER_ID,
     name: '团队知识库（内置）',
-    description: 'knowledge.query/synthesize/global_search 等 6 工具。注意：MCP 通道不区分个人/团队知识可见性（自托管单用户场景使用）；默认推荐经 Agent 工具网关调用。',
+    description:
+      'knowledge.query/synthesize/global_search 等 6 工具。注意：MCP 通道不区分个人/团队知识可见性（自托管单用户场景使用）；默认推荐经 Agent 工具网关调用。',
     enabled: true,
     transport: { type: 'streamable_http', url: mcpUrl },
     created_at: now,

@@ -13,6 +13,7 @@ import type { RefTextAreaType } from '@arco-design/web-react/es/Input';
 import React, { useEffect, useRef } from 'react';
 import styles from '../index.module.css';
 import GuidWorkspaceFootnote from './GuidWorkspaceFootnote';
+import KnowledgeToggle from '@/renderer/components/knowledge/KnowledgeToggle';
 
 type GuidInputCardProps = {
   focusRequestKey?: string;
@@ -150,11 +151,14 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
         {actionRow}
         {slashCommandMenu && <div className='absolute start-0 end-0 top-[calc(100%+4px)] z-70'>{slashCommandMenu}</div>}
       </div>
-      <GuidWorkspaceFootnote
-        workspaceDir={workspaceDir}
-        onSelectWorkspace={onSelectWorkspace}
-        onClearWorkspace={onClearWorkspace}
-      />
+      <div className='flex items-center gap-8px'>
+        <GuidWorkspaceFootnote
+          workspaceDir={workspaceDir}
+          onSelectWorkspace={onSelectWorkspace}
+          onClearWorkspace={onClearWorkspace}
+        />
+        <KnowledgeToggle />
+      </div>
     </div>
   );
 };

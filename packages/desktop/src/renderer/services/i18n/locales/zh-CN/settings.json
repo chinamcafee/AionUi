@@ -412,6 +412,18 @@
   "imageInputSupported": "当前配置已启用",
   "imageInputUnsupported": "当前配置已禁用",
   "imageInputTip": "自动识别会沿用模型目录的能力判断；仅在需要覆盖时手动启用或禁用。",
+  "modelCapability": {
+    "title": "模型能力",
+    "text": "文本",
+    "vision": "视觉",
+    "embedding": "嵌入",
+    "textLabel": "文本模型",
+    "textDesc": "对话与文本生成",
+    "visionLabel": "视觉理解",
+    "visionDesc": "图片输入与理解",
+    "embeddingLabel": "嵌入模型",
+    "embeddingDesc": "仅用于嵌入检索"
+  },
   "openAiApiMode": "OpenAI 请求接口",
   "openAiApiModeAuto": "API · 自动",
   "openAiApiModeChatCompletions": "Chat Completions",
@@ -1349,7 +1361,7 @@
     "prompt": {
       "createAssistant": "帮我创建一个新助手，并引导我完成设置。",
       "addCustomAgent": "帮我添加一个自定义 Agent。",
-      "addModel": "帮我添加一个新的 LLM 模型和 API Key，并设为默认模型。",
+      "addModel": "帮我添加一个新的模型和 API Key，并设为默认模型。如果这是一个嵌入模型（如 embedding-3、bge-m3、text-embedding-3-small 等），请在添加时勾选“嵌入模型”能力开关，系统会自动将其标记为嵌入模型用于知识库检索。如果是视觉模型（支持图片理解），请勾选“视觉理解”能力开关。",
       "addMcp": "帮我配置一个 MCP 服务器。",
       "addSkill": "帮我导入一个技能，并绑定到助手上。",
       "setupRemote": "帮我配置远程访问，让我在手机或外网也能打开 AionUi。",

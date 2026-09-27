@@ -24,7 +24,15 @@ import { getMemoryModel } from './memory-model-util.js';
 export const GRAPH_ENTITY_TYPES = ['person', 'organization', 'project', 'concept', 'event', 'product'] as const;
 export type GraphEntityType = (typeof GRAPH_ENTITY_TYPES)[number];
 /** 关系类型（裁剪版） */
-export const GRAPH_RELATION_TYPES = ['related_to', 'works_at', 'prefers', 'uses', 'causes', 'depends_on', 'part_of'] as const;
+export const GRAPH_RELATION_TYPES = [
+  'related_to',
+  'works_at',
+  'prefers',
+  'uses',
+  'causes',
+  'depends_on',
+  'part_of',
+] as const;
 export type GraphRelationType = (typeof GRAPH_RELATION_TYPES)[number];
 
 export interface ExtractedEntity {
@@ -69,13 +77,17 @@ interface NodeCacheEntry {
   nodes: GraphNodeRow[];
 }
 const nodeCache = new Map<number, NodeCacheEntry>();
-accountRuntime.registerCacheInvalidator(() => { nodeCache.clear(); });
+accountRuntime.registerCacheInvalidator(() => {
+  nodeCache.clear();
+});
 
 // ============================================================
 // T3.2 XML 实体抽取（prompt + 正则解析）
 // ============================================================
 
-const GRAPH_EXTRACTION_PROMPT = (text: string) => `你是知识图谱抽取器。从下面的记忆文本中抽取实体与关系，只输出 XML，不要输出任何其他内容。
+const GRAPH_EXTRACTION_PROMPT = (
+  text: string
+) => `你是知识图谱抽取器。从下面的记忆文本中抽取实体与关系，只输出 XML，不要输出任何其他内容。
 
 实体类型（type 属性只能取其一）：person（人物）、organization（组织/公司）、project（项目）、concept（概念/技术）、event（事件）、product（产品）。
 关系类型（type 属性只能取其一）：related_to（相关）、works_at（任职于）、prefers（偏好）、uses（使用）、causes（导致）、depends_on（依赖于）、part_of（属于/组成部分）。
@@ -188,7 +200,11 @@ function invalidateNodeCache(): void {
 }
 
 /** 加载当前 owner 的全部活跃节点（千级规模 < 1MB；按 generation 短 TTL 缓存，T3.6） */
-async function loadActiveNodes(database: GraphDatabase, tenantId: string, tenantMemberId: string): Promise<GraphNodeRow[]> {
+async function loadActiveNodes(
+  database: GraphDatabase,
+  tenantId: string,
+  tenantMemberId: string
+): Promise<GraphNodeRow[]> {
   const generation = accountRuntime.currentGeneration();
   const cached = nodeCache.get(generation);
   if (cached && Date.now() - cached.at < NODE_CACHE_TTL_MS) return cached.nodes;
@@ -219,7 +235,7 @@ async function loadActiveNodes(database: GraphDatabase, tenantId: string, tenant
  */
 export async function mergeGraphExtraction(
   extraction: GraphExtraction,
-  sourceMemoryId: string,
+  sourceMemoryId: string
 ): Promise<{ nodes: number; edges: number }> {
   const { database, identity } = await getMemoryStoreContext();
   const now = Date.now();
@@ -237,7 +253,10 @@ export async function mergeGraphExtraction(
     const existing = found.rows[0];
     if (existing) {
       const mergedSources = [...new Set([...parseIdArray(existing.source_memory_ids), sourceMemoryId])];
-      const mergedProps = { ...JSON.parse(String(existing.properties ?? '{}')) as Record<string, string>, ...entity.properties };
+      const mergedProps = {
+        ...(JSON.parse(String(existing.properties ?? '{}')) as Record<string, string>),
+        ...entity.properties,
+      };
       await database.execute({
         sql: `UPDATE memory_graph_nodes SET properties = ?, source_memory_ids = ?, stale = 0, updated_at = ? WHERE id = ?`,
         args: [JSON.stringify(mergedProps), JSON.stringify(mergedSources), now, String(existing.id)],
@@ -249,8 +268,17 @@ export async function mergeGraphExtraction(
         sql: `INSERT INTO memory_graph_nodes
           (id, tenant_id, tenant_member_id, type, name, properties, source_memory_ids, stale, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-        args: [id, identity.tenantId, identity.tenantMemberId, entity.type, entity.name,
-          JSON.stringify(entity.properties), JSON.stringify([sourceMemoryId]), now, now],
+        args: [
+          id,
+          identity.tenantId,
+          identity.tenantMemberId,
+          entity.type,
+          entity.name,
+          JSON.stringify(entity.properties),
+          JSON.stringify([sourceMemoryId]),
+          now,
+          now,
+        ],
       });
       if (!nodeIdByName.has(entity.name)) nodeIdByName.set(entity.name, id);
       nodeCount += 1;
@@ -293,8 +321,18 @@ export async function mergeGraphExtraction(
         sql: `INSERT INTO memory_graph_edges
           (id, tenant_id, tenant_member_id, type, source_node_id, target_node_id, weight, source_memory_ids, stale, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
-        args: [newUlid(), identity.tenantId, identity.tenantMemberId, rel.type, sourceId, targetId,
-          rel.weight, JSON.stringify([sourceMemoryId]), now, now],
+        args: [
+          newUlid(),
+          identity.tenantId,
+          identity.tenantMemberId,
+          rel.type,
+          sourceId,
+          targetId,
+          rel.weight,
+          JSON.stringify([sourceMemoryId]),
+          now,
+          now,
+        ],
       });
       edgeCount += 1;
     }
@@ -434,7 +472,10 @@ export async function graphRecall(query: string, limit = 20): Promise<Map<string
     const nodes = await loadActiveNodes(database, identity.tenantId, identity.tenantMemberId);
     if (nodes.length === 0) return hits;
 
-    const entities = extractQueryEntities(trimmed, nodes.map((node) => node.name));
+    const entities = extractQueryEntities(
+      trimmed,
+      nodes.map((node) => node.name)
+    );
     if (entities.length === 0) return hits;
     // 种子：双向 includes 模糊匹配（借鉴 agentmemory）
     const lowered = entities.map((entity) => entity.toLowerCase());
@@ -508,7 +549,9 @@ export async function graphRecall(query: string, limit = 20): Promise<Map<string
       }
     }
 
-    return new Map([...hits.entries()].sort((left, right) => right[1].score - left[1].score).slice(0, Math.max(1, limit)));
+    return new Map(
+      [...hits.entries()].toSorted((left, right) => right[1].score - left[1].score).slice(0, Math.max(1, limit))
+    );
   } catch {
     return new Map();
   }

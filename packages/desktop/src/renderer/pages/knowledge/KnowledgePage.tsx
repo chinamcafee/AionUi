@@ -3,10 +3,13 @@
 import React, { Component, useState, type ReactNode, type ErrorInfo } from 'react';
 import { Alert, Empty, Spin, Tabs } from '@arco-design/web-react';
 import { useTeamAuth } from '@/renderer/hooks/context/TeamAuthContext';
+import { KnowledgeTaskDocks } from '@/renderer/components/knowledge/TaskDock';
 
 class TabErrorBoundary extends Component<{ children: ReactNode; tabName: string }, { error: Error | null }> {
   state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[KnowledgeTab:${this.props.tabName}]`, error, info.componentStack);
   }
@@ -30,7 +33,11 @@ const LazyLibrary = React.lazy(() => import('./LibraryTab').then((m) => ({ defau
 const LazyOrganizers = React.lazy(() => import('./OrganizersTab').then((m) => ({ default: m.OrganizersTab })));
 const LazyGraph = React.lazy(() => import('./GraphTab').then((m) => ({ default: m.GraphTab })));
 
-const tabFallback = <div style={{ textAlign: 'center', padding: 48 }}><Spin tip='加载中…' /></div>;
+const tabFallback = (
+  <div style={{ textAlign: 'center', padding: 48 }}>
+    <Spin tip='加载中…' />
+  </div>
+);
 
 const KnowledgePage: React.FC = () => {
   const { view } = useTeamAuth();
@@ -55,25 +62,34 @@ const KnowledgePage: React.FC = () => {
       <div style={{ marginTop: 12 }}>
         {tab === 'docs' && (
           <TabErrorBoundary tabName='可编辑文档'>
-            <React.Suspense fallback={tabFallback}><LazyDocs /></React.Suspense>
+            <React.Suspense fallback={tabFallback}>
+              <LazyDocs />
+            </React.Suspense>
           </TabErrorBoundary>
         )}
         {tab === 'library' && (
           <TabErrorBoundary tabName='资料库'>
-            <React.Suspense fallback={tabFallback}><LazyLibrary /></React.Suspense>
+            <React.Suspense fallback={tabFallback}>
+              <LazyLibrary />
+            </React.Suspense>
           </TabErrorBoundary>
         )}
         {tab === 'organizers' && (
           <TabErrorBoundary tabName='分组与标签'>
-            <React.Suspense fallback={tabFallback}><LazyOrganizers /></React.Suspense>
+            <React.Suspense fallback={tabFallback}>
+              <LazyOrganizers />
+            </React.Suspense>
           </TabErrorBoundary>
         )}
         {tab === 'graph' && (
           <TabErrorBoundary tabName='知识图谱'>
-            <React.Suspense fallback={tabFallback}><LazyGraph /></React.Suspense>
+            <React.Suspense fallback={tabFallback}>
+              <LazyGraph />
+            </React.Suspense>
           </TabErrorBoundary>
         )}
       </div>
+      <KnowledgeTaskDocks />
     </div>
   );
 };

@@ -20,15 +20,96 @@ const RECALL_WINDOW = 20;
  */
 const STOP_WORDS = new Set([
   // 中文常见停用词
-  '的', '了', '是', '在', '我', '你', '他', '她', '它', '们', '和', '与', '或',
-  '也', '都', '就', '还', '又', '把', '被', '让', '给', '对', '为', '到', '从',
-  '这', '那', '一个', '一些', '什么', '怎么', '为什么', '哪', '哪里', '哪个',
-  '可以', '能', '会', '要', '想', '需要', '应该', '请', '麻烦', '帮', '帮我',
-  '的话', '一下', '吗', '呢', '吧', '啊', '哦', '嗯',
+  '的',
+  '了',
+  '是',
+  '在',
+  '我',
+  '你',
+  '他',
+  '她',
+  '它',
+  '们',
+  '和',
+  '与',
+  '或',
+  '也',
+  '都',
+  '就',
+  '还',
+  '又',
+  '把',
+  '被',
+  '让',
+  '给',
+  '对',
+  '为',
+  '到',
+  '从',
+  '这',
+  '那',
+  '一个',
+  '一些',
+  '什么',
+  '怎么',
+  '为什么',
+  '哪',
+  '哪里',
+  '哪个',
+  '可以',
+  '能',
+  '会',
+  '要',
+  '想',
+  '需要',
+  '应该',
+  '请',
+  '麻烦',
+  '帮',
+  '帮我',
+  '的话',
+  '一下',
+  '吗',
+  '呢',
+  '吧',
+  '啊',
+  '哦',
+  '嗯',
   // 英文常见停用词
-  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'to', 'of', 'in', 'on',
-  'for', 'and', 'or', 'but', 'with', 'as', 'at', 'by', 'from', 'it', 'this',
-  'that', 'i', 'you', 'he', 'she', 'we', 'they', 'my', 'your', 'do', 'does',
+  'the',
+  'a',
+  'an',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'to',
+  'of',
+  'in',
+  'on',
+  'for',
+  'and',
+  'or',
+  'but',
+  'with',
+  'as',
+  'at',
+  'by',
+  'from',
+  'it',
+  'this',
+  'that',
+  'i',
+  'you',
+  'he',
+  'she',
+  'we',
+  'they',
+  'my',
+  'your',
+  'do',
+  'does',
 ]);
 
 export function extractKeywords(text: string, max = 12): string[] {
@@ -68,7 +149,7 @@ export function extractKeywords(text: string, max = 12): string[] {
  */
 export async function retrieveRelevantMemories(
   userInput: string,
-  scope: MemoryScope | MemoryScope[] = 'chat',
+  scope: MemoryScope | MemoryScope[] = 'chat'
 ): Promise<MemoryEntry[]> {
   // T1.11：显式取 top-20 召回窗口，外层 slice 保持注入上限 MAX_RELATED 不变
   const hits = await retrieveHybridMemories(userInput, scope, RECALL_WINDOW);
@@ -82,7 +163,7 @@ export async function retrieveRelevantMemories(
  */
 export async function buildMemoryContextBlock(
   userInput: string,
-  scope: MemoryScope | MemoryScope[] = 'chat',
+  scope: MemoryScope | MemoryScope[] = 'chat'
 ): Promise<string> {
   // T3.8：直接取 HybridMemoryHit（含 viaGraph 图谱标注），注入文案附带「经实体 X 关联」
   const hits = await retrieveHybridMemories(userInput, scope, RECALL_WINDOW);
@@ -91,7 +172,14 @@ export async function buildMemoryContextBlock(
   console.log('[memory-context] userInput:', JSON.stringify(userInput.slice(0, 60)));
   console.log('[memory-context] scope:', JSON.stringify(scope));
   console.log('[memory-context] 检索命中条数:', related.length);
-  for (const h of related) console.log('[memory-context]  -', h.memory.title, '| pinned=' + h.memory.pinned, '| scope=' + h.memory.scope, h.viaGraph ? `| ${h.viaGraph}` : '');
+  for (const h of related)
+    console.log(
+      '[memory-context]  -',
+      h.memory.title,
+      '| pinned=' + h.memory.pinned,
+      '| scope=' + h.memory.scope,
+      h.viaGraph ? `| ${h.viaGraph}` : ''
+    );
   console.log('==============================');
   if (related.length === 0) return '';
 
@@ -126,9 +214,5 @@ export async function buildPinnedMemoriesBlock(scope: MemoryScope | MemoryScope[
   const pinned = all.filter((m) => m.pinned);
   if (pinned.length === 0) return '';
   const lines = pinned.map((m) => `- ⭐[${m.category}] ${m.title}：${m.content}`);
-  return [
-    '## 关于用户的相关记忆',
-    '以下是你已掌握的用户记忆（来自记忆系统，请据此个性化回复）：',
-    ...lines,
-  ].join('\n');
+  return ['## 关于用户的相关记忆', '以下是你已掌握的用户记忆（来自记忆系统，请据此个性化回复）：', ...lines].join('\n');
 }

@@ -5,7 +5,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Tabs } from '@arco-design/web-react';
 import {
-  Button, Card, Empty, Input, List, Message, Modal, Popconfirm, Select, Space, Spin, Switch, Tag, Typography,
+  Button,
+  Card,
+  Empty,
+  Input,
+  List,
+  Message,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Spin,
+  Switch,
+  Tag,
+  Typography,
 } from '@arco-design/web-react';
 import { IconPlus, IconRefresh, IconSearch } from '@arco-design/web-react/icon';
 import { teamApi, TeamApiError, type TeamMemoryEntry } from '@/renderer/api/teamClient';
@@ -13,7 +26,9 @@ import { useTeamAuth } from '@/renderer/hooks/context/TeamAuthContext';
 import { isMemoryInjectionEnabled, setMemoryInjectionEnabled } from '@/renderer/services/memory/memoryInjection';
 import { TeamMemoryPanel } from './TeamMemoryPanel';
 import {
-  getMemoryMergeMode, setMemoryMergeMode, type MemoryMergeMode,
+  getMemoryMergeMode,
+  setMemoryMergeMode,
+  type MemoryMergeMode,
 } from '@/renderer/services/memory/memoryInjection';
 import type { TeamConsolidationOperation } from '@/renderer/api/teamClient';
 
@@ -58,7 +73,11 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await teamApi.listMemories({ category: category || undefined, scope: scope || undefined, search: search.trim() || undefined });
+      const result = await teamApi.listMemories({
+        category: category || undefined,
+        scope: scope || undefined,
+        search: search.trim() || undefined,
+      });
       setMemories(result?.memories ?? []);
     } catch (error) {
       const detail = error instanceof TeamApiError ? error.code : error instanceof Error ? error.message : '未知错误';
@@ -72,7 +91,10 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
     void reload();
   }, [reload]);
 
-  const sorted = useMemo(() => [...memories].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt), [memories]);
+  const sorted = useMemo(
+    () => [...memories].toSorted((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt),
+    [memories]
+  );
 
   const submit = useCallback(async () => {
     if (!draft.title.trim() || !draft.content.trim()) {
@@ -81,7 +103,11 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
     }
     try {
       if (editing) {
-        await teamApi.updateMemory(editing.id, { title: draft.title, content: draft.content, category: draft.category, scope: draft.scope }, editing.version);
+        await teamApi.updateMemory(
+          editing.id,
+          { title: draft.title, content: draft.content, category: draft.category, scope: draft.scope },
+          editing.version
+        );
       } else {
         await teamApi.createMemory(draft);
       }
@@ -94,23 +120,29 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
     }
   }, [draft, editing, reload]);
 
-  const remove = useCallback(async (memory: TeamMemoryEntry) => {
-    try {
-      await teamApi.deleteMemory(memory.id, memory.version);
-      await reload();
-    } catch (error) {
-      Message.error(`删除失败：${error instanceof TeamApiError ? error.code : '未知错误'}`);
-    }
-  }, [reload]);
+  const remove = useCallback(
+    async (memory: TeamMemoryEntry) => {
+      try {
+        await teamApi.deleteMemory(memory.id, memory.version);
+        await reload();
+      } catch (error) {
+        Message.error(`删除失败：${error instanceof TeamApiError ? error.code : '未知错误'}`);
+      }
+    },
+    [reload]
+  );
 
-  const togglePin = useCallback(async (memory: TeamMemoryEntry) => {
-    try {
-      await teamApi.updateMemory(memory.id, { pinned: !memory.pinned }, memory.version);
-      await reload();
-    } catch (error) {
-      Message.error(`操作失败：${error instanceof TeamApiError ? error.code : '未知错误'}`);
-    }
-  }, [reload]);
+  const togglePin = useCallback(
+    async (memory: TeamMemoryEntry) => {
+      try {
+        await teamApi.updateMemory(memory.id, { pinned: !memory.pinned }, memory.version);
+        await reload();
+      } catch (error) {
+        Message.error(`操作失败：${error instanceof TeamApiError ? error.code : '未知错误'}`);
+      }
+    },
+    [reload]
+  );
 
   const consolidate = useCallback(async () => {
     setConsolidating(true);
@@ -134,7 +166,9 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
       setReviewSummary(result.summary);
       setReviewOpen(true);
     } catch (error) {
-      Message.error(`整理失败：${error instanceof TeamApiError ? error.code : error instanceof Error ? error.message : '未知错误'}`);
+      Message.error(
+        `整理失败：${error instanceof TeamApiError ? error.code : error instanceof Error ? error.message : '未知错误'}`
+      );
     } finally {
       setConsolidating(false);
     }
@@ -162,7 +196,7 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
   return (
     <Card
       title='个人记忆（本地优先，仅本人可见）'
-      extra={(
+      extra={
         <Space>
           <span style={{ fontSize: 12 }}>对话注入</span>
           <Switch
@@ -185,7 +219,9 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
               setMergeMode(next);
             }}
           />
-          <Button size='small' icon={<IconRefresh />} onClick={() => void reload()}>刷新</Button>
+          <Button size='small' icon={<IconRefresh />} onClick={() => void reload()}>
+            刷新
+          </Button>
           <Button
             size='small'
             type='primary'
@@ -208,15 +244,25 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
             新建
           </Button>
         </Space>
-      )}
+      }
     >
       <Space style={{ marginBottom: 12 }} size={8}>
         <Select size='small' style={{ width: 120 }} value={category} options={CATEGORIES} onChange={setCategory} />
         <Select size='small' style={{ width: 120 }} value={scope} options={SCOPES} onChange={setScope} />
-        <Input size='small' style={{ width: 220 }} prefix={<IconSearch />} placeholder='搜索标题/内容' value={search} onChange={setSearch} allowClear />
+        <Input
+          size='small'
+          style={{ width: 220 }}
+          prefix={<IconSearch />}
+          placeholder='搜索标题/内容'
+          value={search}
+          onChange={setSearch}
+          allowClear
+        />
       </Space>
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
+        <div style={{ textAlign: 'center', padding: 32 }}>
+          <Spin />
+        </div>
       ) : sorted.length === 0 ? (
         <Empty description='暂无记忆：完成对话后自动抽取，或点击右上角新建' />
       ) : (
@@ -235,28 +281,47 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
                   type='text'
                   onClick={() => {
                     setEditing(memory);
-                    setDraft({ title: memory.title, content: memory.content, category: memory.category, scope: memory.scope });
+                    setDraft({
+                      title: memory.title,
+                      content: memory.content,
+                      category: memory.category,
+                      scope: memory.scope,
+                    });
                     setModalOpen(true);
                   }}
                 >
                   编辑
                 </Button>,
-                onUpgrade && <Button key='upgrade' size='mini' type='text' onClick={() => onUpgrade(memory)}>升级为团队记忆</Button>,
+                onUpgrade && (
+                  <Button key='upgrade' size='mini' type='text' onClick={() => onUpgrade(memory)}>
+                    升级为团队记忆
+                  </Button>
+                ),
                 <Popconfirm key='delete' title='确认删除该记忆？' onOk={() => void remove(memory)}>
-                  <Button size='mini' type='text' status='danger'>删除</Button>
+                  <Button size='mini' type='text' status='danger'>
+                    删除
+                  </Button>
                 </Popconfirm>,
               ]}
             >
               <List.Item.Meta
-                title={(
+                title={
                   <Space size={8}>
-                    {memory.pinned && <Tag size='small' color='gold'>置顶</Tag>}
+                    {memory.pinned && (
+                      <Tag size='small' color='gold'>
+                        置顶
+                      </Tag>
+                    )}
                     <Typography.Text bold>{memory.title}</Typography.Text>
-                    <Tag size='small' color={CATEGORY_COLOR[memory.category] ?? 'gray'}>{memory.category}</Tag>
+                    <Tag size='small' color={CATEGORY_COLOR[memory.category] ?? 'gray'}>
+                      {memory.category}
+                    </Tag>
                     <Tag size='small'>{memory.scope === 'code' ? '编码' : '对话'}</Tag>
-                    <Typography.Text type='secondary' size='small'>v{memory.version}</Typography.Text>
+                    <Typography.Text type='secondary' size='small'>
+                      v{memory.version}
+                    </Typography.Text>
                   </Space>
-                )}
+                }
                 description={memory.content}
               />
             </List.Item>
@@ -274,23 +339,35 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
         okButtonProps={{ loading: consolidating }}
         style={{ width: 620 }}
       >
-        <Typography.Text type='secondary' style={{ display: 'block', marginBottom: 8 }}>{reviewSummary}</Typography.Text>
+        <Typography.Text type='secondary' style={{ display: 'block', marginBottom: 8 }}>
+          {reviewSummary}
+        </Typography.Text>
         <div style={{ maxHeight: 400, overflow: 'auto' }}>
           {reviewOps.map((op) => (
             <div
               key={op.id}
               style={{
-                padding: '8px 12px', marginBottom: 6, borderRadius: 6,
-                border: selectedOpIds.includes(op.id) ? '1px solid var(--color-primary-light-3)' : '1px solid var(--color-border-2)',
+                padding: '8px 12px',
+                marginBottom: 6,
+                borderRadius: 6,
+                border: selectedOpIds.includes(op.id)
+                  ? '1px solid var(--color-primary-light-3)'
+                  : '1px solid var(--color-border-2)',
                 cursor: 'pointer',
               }}
               onClick={() => {
                 setSelectedOpIds((prev) =>
-                  prev.includes(op.id) ? prev.filter((id) => id !== op.id) : [...prev, op.id]);
+                  prev.includes(op.id) ? prev.filter((id) => id !== op.id) : [...prev, op.id]
+                );
               }}
             >
               <Space size={8}>
-                <input type='checkbox' checked={selectedOpIds.includes(op.id)} readOnly style={{ pointerEvents: 'none' }} />
+                <input
+                  type='checkbox'
+                  checked={selectedOpIds.includes(op.id)}
+                  readOnly
+                  style={{ pointerEvents: 'none' }}
+                />
                 <Tag size='small' color={op.type === 'merge' ? 'arcoblue' : op.type === 'delete' ? 'red' : 'green'}>
                   {op.type === 'merge' ? '合并' : op.type === 'delete' ? '清理' : '更新'}
                 </Tag>
@@ -302,7 +379,8 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
               </Typography.Paragraph>
               {op.content && (
                 <Typography.Paragraph type='secondary' size='small' style={{ marginBottom: 0 }}>
-                  {op.content.slice(0, 100)}{op.content.length > 100 ? '…' : ''}
+                  {op.content.slice(0, 100)}
+                  {op.content.length > 100 ? '…' : ''}
                 </Typography.Paragraph>
               )}
             </div>
@@ -318,11 +396,30 @@ const PersonalMemoryPanel: React.FC<{ onUpgrade?: (memory: TeamMemoryEntry) => v
         okText='保存'
       >
         <Space direction='vertical' size='large' style={{ width: '100%' }}>
-          <Input placeholder='标题（<=20 字）' value={draft.title} onChange={(v) => setDraft((d) => ({ ...d, title: v }))} />
-          <Input.TextArea placeholder='内容' autoSize={{ minRows: 3, maxRows: 8 }} value={draft.content} onChange={(v) => setDraft((d) => ({ ...d, content: v }))} />
+          <Input
+            placeholder='标题（<=20 字）'
+            value={draft.title}
+            onChange={(v) => setDraft((d) => ({ ...d, title: v }))}
+          />
+          <Input.TextArea
+            placeholder='内容'
+            autoSize={{ minRows: 3, maxRows: 8 }}
+            value={draft.content}
+            onChange={(v) => setDraft((d) => ({ ...d, content: v }))}
+          />
           <Space>
-            <Select style={{ width: 120 }} value={draft.category} options={CATEGORIES.slice(1)} onChange={(v) => setDraft((d) => ({ ...d, category: v }))} />
-            <Select style={{ width: 120 }} value={draft.scope} options={SCOPES.slice(1)} onChange={(v) => setDraft((d) => ({ ...d, scope: v }))} />
+            <Select
+              style={{ width: 120 }}
+              value={draft.category}
+              options={CATEGORIES.slice(1)}
+              onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
+            />
+            <Select
+              style={{ width: 120 }}
+              value={draft.scope}
+              options={SCOPES.slice(1)}
+              onChange={(v) => setDraft((d) => ({ ...d, scope: v }))}
+            />
           </Space>
         </Space>
       </Modal>
@@ -347,7 +444,12 @@ const MemoryPage: React.FC = () => {
     <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
       <Tabs activeTab={activeTab} onChange={(key) => setActiveTab(key as 'personal' | 'team')}>
         <Tabs.TabPane key='personal' title='个人记忆'>
-          <PersonalMemoryPanel onUpgrade={(memory) => { setUpgradeTarget(memory); setActiveTab('team'); }} />
+          <PersonalMemoryPanel
+            onUpgrade={(memory) => {
+              setUpgradeTarget(memory);
+              setActiveTab('team');
+            }}
+          />
         </Tabs.TabPane>
         <Tabs.TabPane key='team' title='团队记忆'>
           <TeamMemoryPanel initialUpgrade={upgradeTarget} onUpgradeConsumed={() => setUpgradeTarget(null)} />

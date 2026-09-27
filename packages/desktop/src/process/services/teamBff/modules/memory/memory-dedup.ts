@@ -77,7 +77,10 @@ export async function judgeMemorySimilarity(candidate: Candidate): Promise<Dedup
   }
 }
 
-export const DEDUP_PROMPT = (candidate: Candidate, existing: MemoryEntry[]) => `你是一个记忆去重助手。判断「待判定记忆」与下方「已有记忆列表」的关系，决定是丢弃、合并还是新建。
+export const DEDUP_PROMPT = (
+  candidate: Candidate,
+  existing: MemoryEntry[]
+) => `你是一个记忆去重助手。判断「待判定记忆」与下方「已有记忆列表」的关系，决定是丢弃、合并还是新建。
 
 ## 相似度判定（按"主题/实体"维度）
 - exact   = 完全相似：与某条已有记忆是同一事实，仅措辞/标点/语序不同 → 丢弃
@@ -116,7 +119,10 @@ ${existing.map((m, i) => `#${i} [id:${m.id}] ${m.title} —— ${m.content}`).jo
 /** 解析 LLM 判定输出。任何异常都降级为 {level:'none'}。 */
 export function parseDedupResult(text: string, existing: MemoryEntry[]): DedupResult {
   try {
-    const jsonStr = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const jsonStr = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
     const parsed = JSON.parse(jsonStr) as {
       level?: string;
       existingIndex?: number;
@@ -125,9 +131,7 @@ export function parseDedupResult(text: string, existing: MemoryEntry[]): DedupRe
     };
     if (!parsed.level || parsed.level === 'none') return { level: 'none' };
     const validLevels: SimilarityLevel[] = ['exact', 'high', 'partial'];
-    const level = validLevels.includes(parsed.level as SimilarityLevel)
-      ? (parsed.level as SimilarityLevel)
-      : 'none';
+    const level = validLevels.includes(parsed.level as SimilarityLevel) ? (parsed.level as SimilarityLevel) : 'none';
     if (level === 'none') return { level: 'none' };
     const idx = Number(parsed.existingIndex);
     const existingId = Number.isInteger(idx) && existing[idx] ? existing[idx].id : undefined;

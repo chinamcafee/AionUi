@@ -1,6 +1,9 @@
 const HLC_PATTERN = /^(\d{13}):(\d{6})$/;
 
-export interface HlcParts { wallTime: number; counter: number }
+export interface HlcParts {
+  wallTime: number;
+  counter: number;
+}
 
 export function parseHlc(value: string): HlcParts | null {
   const match = HLC_PATTERN.exec(value);
@@ -30,7 +33,8 @@ export class HybridLogicalClock {
     const parsed = parseHlc(remote);
     if (!parsed) throw new Error('HLC_REMOTE_INVALID');
     const nextWall = Math.max(this.wallTime, parsed.wallTime, physicalTime);
-    if (nextWall === this.wallTime && nextWall === parsed.wallTime) this.counter = Math.max(this.counter, parsed.counter) + 1;
+    if (nextWall === this.wallTime && nextWall === parsed.wallTime)
+      this.counter = Math.max(this.counter, parsed.counter) + 1;
     else if (nextWall === this.wallTime) this.counter += 1;
     else if (nextWall === parsed.wallTime) this.counter = parsed.counter + 1;
     else this.counter = 0;

@@ -2,8 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  observeTeamMemoryRevision, startTeamMemoryInvalidationStream,
-  stopTeamMemoryInvalidationStream, teamMemoryInvalidationSnapshot,
+  observeTeamMemoryRevision,
+  startTeamMemoryInvalidationStream,
+  stopTeamMemoryInvalidationStream,
+  teamMemoryInvalidationSnapshot,
 } from '@/process/services/teamBff/modules/memory/team-memory-invalidation';
 import { createMemoryRoutes } from '@/process/services/teamBff/modules/memory/routes';
 
@@ -40,7 +42,7 @@ describe('团队记忆路由校验（无账号态）', () => {
   it('GET /team-memories 未配置网关 → 503 结构化错误', async () => {
     const response = await app.request('/team-memories');
     expect(response.status).toBe(503);
-    const payload = await response.json() as { error: string };
+    const payload = (await response.json()) as { error: string };
     expect(payload.error).toBe('TEAM_GATEWAY_UNAVAILABLE');
   });
 
@@ -57,7 +59,7 @@ describe('团队记忆路由校验（无账号态）', () => {
 
   it('GET /team-memory-invalidation 返回快照形状', async () => {
     const response = await app.request('/team-memory-invalidation');
-    const payload = await response.json() as { state: { connected: boolean; dirty: boolean } };
+    const payload = (await response.json()) as { state: { connected: boolean; dirty: boolean } };
     expect(payload.state).toMatchObject({ connected: false, dirty: false });
   });
 });

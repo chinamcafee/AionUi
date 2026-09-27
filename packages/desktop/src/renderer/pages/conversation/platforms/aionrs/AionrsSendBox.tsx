@@ -8,7 +8,13 @@ import { ipcBridge } from '@/common';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
 import { useMessageList } from '@renderer/pages/conversation/Messages/hooks';
-import { enhanceInputWithTeamMemory, useTeamMemoryTurnExtract, INJECTION_MARK } from '@/renderer/services/memory/memoryInjection';
+import {
+  enhanceInputWithTeamMemory,
+  useTeamMemoryTurnExtract,
+  INJECTION_MARK,
+} from '@/renderer/services/memory/memoryInjection';
+import KnowledgeToggle from '@/renderer/components/knowledge/KnowledgeToggle';
+import { isKnowledgeEnabled } from '@/renderer/services/knowledge/knowledgeToggle';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -256,7 +262,11 @@ const AionrsSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input: rawInput, files, sessions }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
+    async ({
+      input: rawInput,
+      files,
+      sessions,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'sessions'>) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
@@ -267,7 +277,7 @@ const AionrsSendBox: React.FC<{
       // 命令队列、常规发送与打断优先全部路径；INJECTION_MARK 防重复包装。
       const input = rawInput.includes(INJECTION_MARK)
         ? rawInput
-        : await enhanceInputWithTeamMemory(rawInput, { messages });
+        : await enhanceInputWithTeamMemory(rawInput, { messages, includeKnowledge: isKnowledgeEnabled() });
 
       // The message body is plain user text; the backend resolves each
       // ChatFileRef to an absolute path and injects the [[AION_FILES]] marker at
@@ -807,11 +817,14 @@ const AionrsSendBox: React.FC<{
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <KnowledgeToggle />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>

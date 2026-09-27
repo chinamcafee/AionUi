@@ -15,16 +15,22 @@ export interface ContextHit {
   mandatory: boolean;
   queryMatched: boolean;
   sensitivity?: string;
-  semanticType?: 'team_policy' | 'personal_requirement' | 'team_fact' | 'personal_preference' | 'personal_fact' | 'knowledge';
+  semanticType?:
+    | 'team_policy'
+    | 'personal_requirement'
+    | 'team_fact'
+    | 'personal_preference'
+    | 'personal_fact'
+    | 'knowledge';
   /** T3.8 图谱流命中标注（"经实体 X 关联"），随注入文案与 UI 透传 */
   viaGraph?: string;
 }
 
 export interface CloudContextResult {
-	teamMemories: ContextHit[];
-	knowledgeHits: ContextHit[];
-	teamMemoryActivationEpoch: number;
-	teamMemoryRevision: number;
+  teamMemories: ContextHit[];
+  knowledgeHits: ContextHit[];
+  teamMemoryActivationEpoch: number;
+  teamMemoryRevision: number;
   tenantPolicyVersion: number;
   teamPolicyVersion: number;
   retrievalTraceId: string;
@@ -38,20 +44,26 @@ export interface ParallelContextResult {
 }
 
 function personalRetriever(query: string, scope: MemoryScope | MemoryScope[], limit: number) {
-  return retrieveHybridMemories(query, scope, limit).then((hits): ContextHit[] => hits.map(({ memory, score, channels, viaGraph }) => ({
-    id: memory.id,
-    kind: 'personal_memory',
-    title: memory.title,
-    text: memory.content,
-    score,
-    sourceId: memory.id,
-    version: `v${memory.version}`,
-    mandatory: memory.pinned,
-    queryMatched: channels.some((channel) => channel !== 'pinned'),
-    semanticType: memory.category === 'requirement' ? 'personal_requirement'
-      : memory.category === 'preference' ? 'personal_preference' : 'personal_fact',
-    ...(viaGraph ? { viaGraph } : {}),
-  })));
+  return retrieveHybridMemories(query, scope, limit).then((hits): ContextHit[] =>
+    hits.map(({ memory, score, channels, viaGraph }) => ({
+      id: memory.id,
+      kind: 'personal_memory',
+      title: memory.title,
+      text: memory.content,
+      score,
+      sourceId: memory.id,
+      version: `v${memory.version}`,
+      mandatory: memory.pinned,
+      queryMatched: channels.some((channel) => channel !== 'pinned'),
+      semanticType:
+        memory.category === 'requirement'
+          ? 'personal_requirement'
+          : memory.category === 'preference'
+            ? 'personal_preference'
+            : 'personal_fact',
+      ...(viaGraph ? { viaGraph } : {}),
+    }))
+  );
 }
 
 async function cloudRetriever(
@@ -59,10 +71,10 @@ async function cloudRetriever(
   includeKnowledge: boolean,
   conversationMode: 'chat' | 'coding',
   teamMemoryLimit = 8,
-  knowledgeOrganizerFilter: KnowledgeOrganizerFilter = { groupIds: [], tagIds: [] },
+  knowledgeOrganizerFilter: KnowledgeOrganizerFilter = { groupIds: [], tagIds: [] }
 ): Promise<CloudContextResult> {
   const { tenantId, teamId } = currentTeamGatewayScope();
-  const data = await callTeamGateway(
+  const data = (await callTeamGateway(
     `/api/v1/tenants/${encodeURIComponent(tenantId)}/teams/${encodeURIComponent(teamId)}/context:retrieve`,
     {
       method: 'POST',
@@ -75,12 +87,18 @@ async function cloudRetriever(
         organizerFilter: knowledgeOrganizerFilter,
         limits: { teamMemory: teamMemoryLimit, knowledge: 12 },
       }),
-    },
-  ) as CloudContextResult;
-  if (!data || !Array.isArray(data.teamMemories) || !Array.isArray(data.knowledgeHits) ||
-      !Array.isArray(data.degraded) || typeof data.retrievalTraceId !== 'string' ||
-      typeof data.teamMemoryActivationEpoch !== 'number' || typeof data.teamMemoryRevision !== 'number' ||
-      [...data.teamMemories, ...data.knowledgeHits].some((hit) => typeof hit.queryMatched !== 'boolean')) {
+    }
+  )) as CloudContextResult;
+  if (
+    !data ||
+    !Array.isArray(data.teamMemories) ||
+    !Array.isArray(data.knowledgeHits) ||
+    !Array.isArray(data.degraded) ||
+    typeof data.retrievalTraceId !== 'string' ||
+    typeof data.teamMemoryActivationEpoch !== 'number' ||
+    typeof data.teamMemoryRevision !== 'number' ||
+    [...data.teamMemories, ...data.knowledgeHits].some((hit) => typeof hit.queryMatched !== 'boolean')
+  ) {
     throw new Error('CONTEXT_BROKER_RESPONSE_INVALID');
   }
   observeTeamMemoryRevision(data.teamMemoryRevision);
@@ -100,7 +118,7 @@ export async function retrieveParallelContext(
   scope: MemoryScope | MemoryScope[] = 'chat',
   includeKnowledge = true,
   conversationMode: 'chat' | 'coding' = Array.isArray(scope) && scope.includes('code') ? 'coding' : 'chat',
-  options: { rerank?: ContextChannelReranker; knowledgeOrganizerFilter?: KnowledgeOrganizerFilter } = {},
+  options: { rerank?: ContextChannelReranker; knowledgeOrganizerFilter?: KnowledgeOrganizerFilter } = {}
 ): Promise<ParallelContextResult> {
   const normalized = query.normalize('NFKC').trim().slice(0, 16_000);
   if (!normalized) return { personalHits: [], cloud: null, degraded: [] };
@@ -109,22 +127,26 @@ export async function retrieveParallelContext(
   const { rerank } = options;
   const candidateDepth = rerank ? 20 : 8;
   const [personal, cloud] = await Promise.allSettled([
-    personalRetriever(normalized, scope, candidateDepth)
-      .then((hits) => (rerank ? rerank(normalized, hits, 8) : hits)),
-    cloudRetriever(normalized, includeKnowledge, conversationMode, candidateDepth, options.knowledgeOrganizerFilter)
-      .then(async (data) => (rerank
-        ? { ...data, teamMemories: await rerank(normalized, data.teamMemories, 8) }
-        : data)),
+    personalRetriever(normalized, scope, candidateDepth).then((hits) => (rerank ? rerank(normalized, hits, 8) : hits)),
+    cloudRetriever(
+      normalized,
+      includeKnowledge,
+      conversationMode,
+      candidateDepth,
+      options.knowledgeOrganizerFilter
+    ).then(async (data) => (rerank ? { ...data, teamMemories: await rerank(normalized, data.teamMemories, 8) } : data)),
   ]);
   const degraded: string[] = [];
   if (personal.status === 'rejected') degraded.push('personal_retriever_unavailable');
   if (cloud.status === 'rejected') {
-    const reason = cloud.reason instanceof Error
-      ? `${cloud.reason.name}:${cloud.reason.message}`
-      : String(cloud.reason);
+    const reason =
+      cloud.reason instanceof Error ? `${cloud.reason.name}:${cloud.reason.message}` : String(cloud.reason);
     console.warn(`[context-broker] cloud retrieval failed: ${reason.slice(0, 300)}`);
-    degraded.push(cloud.reason instanceof Error && cloud.reason.name === 'TimeoutError'
-      ? 'cloud_timeout' : 'cloud_retriever_unavailable');
+    degraded.push(
+      cloud.reason instanceof Error && cloud.reason.name === 'TimeoutError'
+        ? 'cloud_timeout'
+        : 'cloud_retriever_unavailable'
+    );
   }
   if (cloud.status === 'fulfilled') degraded.push(...cloud.value.degraded);
   return {
@@ -149,9 +171,11 @@ export async function reportTeamMemoryRecall(memoryIds: readonly string[]): Prom
         method: 'POST',
         signal: AbortSignal.timeout(2_500),
         body: JSON.stringify({ memoryIds: [...new Set(memoryIds)] }),
-      },
+      }
     );
-  } catch { /* 失败静默：统计性回写，不影响回复链路 */ }
+  } catch {
+    /* 失败静默：统计性回写，不影响回复链路 */
+  }
 }
 
 /** 原始分区渲染仅供诊断；生产 Agent 使用 T707 的 fuseAndBudgetContext。 */
@@ -169,7 +193,8 @@ export function renderParallelContext(result: ParallelContextResult): string {
   }
   if (result.cloud?.knowledgeHits.length) {
     lines.push('', '## 知识库检索结果');
-    for (const hit of result.cloud.knowledgeHits) lines.push(`- [K:${hit.sourceId}] ${hit.title ? `${hit.title}：` : ''}${hit.text}`);
+    for (const hit of result.cloud.knowledgeHits)
+      lines.push(`- [K:${hit.sourceId}] ${hit.title ? `${hit.title}：` : ''}${hit.text}`);
   }
   if (result.degraded.length > 0) lines.push('', `<!-- context-degraded:${result.degraded.join(',')} -->`);
   return lines.join('\n').trim();

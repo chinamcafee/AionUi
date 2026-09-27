@@ -402,6 +402,18 @@
   "imageInputSupported": "Durch Konfiguration aktiviert",
   "imageInputUnsupported": "Durch Konfiguration deaktiviert",
   "imageInputTip": "Automatisch verwendet die Modellerkennung aus dem Katalog. Nur zum Überschreiben explizit aktivieren oder deaktivieren.",
+  "modelCapability": {
+    "title": "Modellfähigkeiten",
+    "text": "Text",
+    "vision": "Vision",
+    "embedding": "Embedding",
+    "textLabel": "Textmodell",
+    "textDesc": "Dialog und Textgenerierung",
+    "visionLabel": "Visuelles Verständnis",
+    "visionDesc": "Bildeingabe und -verständnis",
+    "embeddingLabel": "Embedding-Modell",
+    "embeddingDesc": "Nur für Vektorsuche"
+  },
   "openAiApiMode": "OpenAI-Anfrage-API",
   "openAiApiModeAuto": "API · Automatisch",
   "openAiApiModeChatCompletions": "Chat Completions",

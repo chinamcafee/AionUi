@@ -412,6 +412,18 @@
   "imageInputSupported": "Activé par la configuration",
   "imageInputUnsupported": "Désactivé par la configuration",
   "imageInputTip": "Le mode automatique utilise la détection des capacités du catalogue. Activez ou désactivez uniquement pour la remplacer.",
+  "modelCapability": {
+    "title": "Capacités du Modèle",
+    "text": "Texte",
+    "vision": "Vision",
+    "embedding": "Embedding",
+    "textLabel": "Modèle de Texte",
+    "textDesc": "Dialogue et génération de texte",
+    "visionLabel": "Compréhension Visuelle",
+    "visionDesc": "Entrée et compréhension d’images",
+    "embeddingLabel": "Modèle d’Embedding",
+    "embeddingDesc": "Réservé à la recherche vectorielle"
+  },
   "openAiApiMode": "API de requête OpenAI",
   "openAiApiModeAuto": "API · Automatique",
   "openAiApiModeChatCompletions": "Chat Completions",

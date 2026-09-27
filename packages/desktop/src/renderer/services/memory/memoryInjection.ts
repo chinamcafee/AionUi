@@ -34,9 +34,8 @@ export function stripInjectionBlock(text: string): string {
   if (!text.includes(INJECTION_MARK)) return text;
   const start = text.indexOf(INJECTION_MARK);
   const endMark = text.indexOf(INJECTION_MARK_END, start);
-  const stripped = endMark >= 0
-    ? text.slice(0, start) + text.slice(endMark + INJECTION_MARK_END.length)
-    : text.slice(0, start); // 无结束标记（流式/异常）时保守丢弃后段
+  const stripped =
+    endMark >= 0 ? text.slice(0, start) + text.slice(endMark + INJECTION_MARK_END.length) : text.slice(0, start); // 无结束标记（流式/异常）时保守丢弃后段
   return stripped.replace(/^\n+/, '').replace(/^\s+/, '');
 }
 
@@ -126,7 +125,9 @@ export function getMemoryMergeMode(): MemoryMergeMode {
 export function setMemoryMergeMode(mode: MemoryMergeMode) {
   try {
     localStorage.setItem(MERGE_MODE_KEY, mode);
-  } catch { /* storage 不可用时忽略 */ }
+  } catch {
+    /* storage 不可用时忽略 */
+  }
 }
 
 /**
@@ -135,12 +136,20 @@ export function setMemoryMergeMode(mode: MemoryMergeMode) {
  * 手动模式：弹窗供用户确认（Arco Modal.confirm，可从任意上下文调用）；
  * 自动模式：直接合并并高亮提示。
  */
-async function handleNewMemoryMerge(created: { id: string; title: string; content: string; category?: string; scope?: string }): Promise<void> {
+async function handleNewMemoryMerge(created: {
+  id: string;
+  title: string;
+  content: string;
+  category?: string;
+  scope?: string;
+}): Promise<void> {
   let check: Awaited<ReturnType<typeof teamApi.checkMemorySimilarity>>;
   try {
     check = await teamApi.checkMemorySimilarity({
-      title: created.title, content: created.content,
-      category: created.category, scope: created.scope,
+      title: created.title,
+      content: created.content,
+      category: created.category,
+      scope: created.scope,
     });
   } catch {
     return; // 查重失败不阻断（可能是模型未绑定）
@@ -148,14 +157,18 @@ async function handleNewMemoryMerge(created: { id: string; title: string; conten
   if (check.level === 'none' || !check.existingId || !check.mergedTitle || !check.mergedContent) return;
 
   const doMerge = () =>
-    teamApi.mergeMemoryPair({
-      sourceId: created.id, targetId: check.existingId!,
-      mergedTitle: check.mergedTitle!, mergedContent: check.mergedContent!,
-      category: created.category,
-    }).then((r) => {
-      // eslint-disable-next-line no-console
-      console.info('[teamMemory] merged pair ok, applied:', r.appliedCount);
-    });
+    teamApi
+      .mergeMemoryPair({
+        sourceId: created.id,
+        targetId: check.existingId!,
+        mergedTitle: check.mergedTitle!,
+        mergedContent: check.mergedContent!,
+        category: created.category,
+      })
+      .then((r) => {
+        // eslint-disable-next-line no-console
+        console.info('[teamMemory] merged pair ok, applied:', r.appliedCount);
+      });
 
   if (getMemoryMergeMode() === 'auto') {
     try {
@@ -173,15 +186,33 @@ async function handleNewMemoryMerge(created: { id: string; title: string; conten
   const { React } = await import('react');
   Modal.confirm({
     title: '检测到可合并的记忆',
-    content: React.createElement('div', { style: { lineHeight: 1.8 } },
+    content: React.createElement(
+      'div',
+      { style: { lineHeight: 1.8 } },
       React.createElement('p', null, `新记忆「${created.title}」与已有记忆相似，是否合并？`),
-      React.createElement('blockquote', {
-        style: { borderLeft: '3px solid var(--color-primary-light-2)', paddingLeft: 12, margin: '8px 0', color: 'var(--color-text-2)', fontSize: 13 },
-      },
+      React.createElement(
+        'blockquote',
+        {
+          style: {
+            borderLeft: '3px solid var(--color-primary-light-2)',
+            paddingLeft: 12,
+            margin: '8px 0',
+            color: 'var(--color-text-2)',
+            fontSize: 13,
+          },
+        },
         React.createElement('p', null, `合并后标题：${check.mergedTitle}`),
-        React.createElement('p', null, `合并后内容：${(check.mergedContent ?? '').slice(0, 120)}${check.mergedContent.length > 120 ? '…' : ''}`),
+        React.createElement(
+          'p',
+          null,
+          `合并后内容：${(check.mergedContent ?? '').slice(0, 120)}${check.mergedContent.length > 120 ? '…' : ''}`
+        )
       ),
-      React.createElement('p', { style: { color: 'var(--color-text-3)', fontSize: 12 } }, '合并将把新记忆并入已有条目，源条目将被移除。'),
+      React.createElement(
+        'p',
+        { style: { color: 'var(--color-text-3)', fontSize: 12 } },
+        '合并将把新记忆并入已有条目，源条目将被移除。'
+      )
     ),
     okText: '合并',
     cancelText: '保留两条',
@@ -195,33 +226,50 @@ const TEAM_SHARE_HINT_RE = /团队|共享|全员|大家|同事|一起用/i;
 function submitMemorizeBlocks(blocks: MemorizeBlock[], userText: string): void {
   const teamExplicit = TEAM_SHARE_HINT_RE.test(userText);
   for (const rawBlock of blocks) {
-    const block = rawBlock.audience === 'team' && !teamExplicit
-      ? { ...rawBlock, audience: 'personal' as const }
-      : rawBlock;
+    const block =
+      rawBlock.audience === 'team' && !teamExplicit ? { ...rawBlock, audience: 'personal' as const } : rawBlock;
     if (block !== rawBlock) {
       // eslint-disable-next-line no-console -- 观测点：归属原则防御性降级
       console.info('[teamMemory] downgrade team->personal（用户未显式要求共享）:', rawBlock.title);
     }
-    const request = block.audience === 'team'
-      ? teamApi.createTeamMemory({
-        title: block.title, content: block.content,
-        category: block.category, memoryScope: block.scope, tags: [],
-      })
-      : teamApi.createMemory({
-        title: block.title, content: block.content,
-        category: block.category, scope: block.scope,
-      });
+    const request =
+      block.audience === 'team'
+        ? teamApi.createTeamMemory({
+            title: block.title,
+            content: block.content,
+            category: block.category,
+            memoryScope: block.scope,
+            tags: [],
+          })
+        : teamApi.createMemory({
+            title: block.title,
+            content: block.content,
+            category: block.category,
+            scope: block.scope,
+          });
     void request
       .then(async (result) => {
         const warning = (result as { warning?: string } | null)?.warning;
         // eslint-disable-next-line no-console -- 观测点：记忆协议提交结果
-        console.info('[teamMemory] memorize ->', block.audience, block.title, warning ? `（草稿已建，提交审批未完成：${warning}）` : 'ok');
+        console.info(
+          '[teamMemory] memorize ->',
+          block.audience,
+          block.title,
+          warning ? `（草稿已建，提交审批未完成：${warning}）` : 'ok'
+        );
         // 个人记忆新增后查重 + 双模式合并（E-18）
         if (block.audience === 'personal') {
           const created = result as { id?: string } | { candidate?: { id?: string } } | null;
-          const createdId = (created as { id?: string })?.id ?? (created as { candidate?: { id?: string } })?.candidate?.id;
+          const createdId =
+            (created as { id?: string })?.id ?? (created as { candidate?: { id?: string } })?.candidate?.id;
           if (typeof createdId === 'string') {
-            void handleNewMemoryMerge({ id: createdId, title: block.title, content: block.content, category: block.category, scope: block.scope });
+            void handleNewMemoryMerge({
+              id: createdId,
+              title: block.title,
+              content: block.content,
+              category: block.category,
+              scope: block.scope,
+            });
           }
         }
       })
@@ -243,7 +291,14 @@ function tryExtractExchange(exchange: { userText: string; assistantText: string 
     return;
   }
   if (!teamBffBaseUrl() || !isMemoryInjectionEnabled()) {
-    console.info('[teamMemory] skip(', trigger, '): bff=', teamBffBaseUrl(), 'injectionEnabled=', isMemoryInjectionEnabled());
+    console.info(
+      '[teamMemory] skip(',
+      trigger,
+      '): bff=',
+      teamBffBaseUrl(),
+      'injectionEnabled=',
+      isMemoryInjectionEnabled()
+    );
     return;
   }
   const signature = exchangeSignature(exchange.userText);
@@ -266,6 +321,8 @@ export interface EnhanceOptions {
   conversationMode?: 'chat' | 'coding';
   /** 当前会话消息列表（用于上一轮抽取），缺省跳过抽取 */
   messages?: TMessage[];
+  /** 知识库开关（对齐 client Q2）：false 时 assemble 不召回 KE 知识，仅注入记忆 */
+  includeKnowledge?: boolean;
 }
 
 /**
@@ -276,13 +333,23 @@ export async function enhanceInputWithTeamMemory(rawInput: string, options: Enha
   if (!teamBffBaseUrl() || !isMemoryInjectionEnabled() || !rawInput.trim()) return rawInput;
 
   // 双触发第二路：发送时兜底抽取上一轮交换（与回合结束共用去重注册表，不会重复落库）
-  console.info('[teamMemory] enhance gate: bff=', teamBffBaseUrl(), 'enabled=', isMemoryInjectionEnabled(), 'msgs=', options.messages?.length ?? 0, 'lastExchange=', findLastCompletedExchange(options.messages ?? []) ? 'hit' : 'null');
+  console.info(
+    '[teamMemory] enhance gate: bff=',
+    teamBffBaseUrl(),
+    'enabled=',
+    isMemoryInjectionEnabled(),
+    'msgs=',
+    options.messages?.length ?? 0,
+    'lastExchange=',
+    findLastCompletedExchange(options.messages ?? []) ? 'hit' : 'null'
+  );
   tryExtractExchange(findLastCompletedExchange(options.messages ?? []), 'send');
 
   try {
     const result = await teamApi.assembleContext(rawInput, {
       scope: options.scope ?? 'chat',
       conversationMode: options.conversationMode ?? 'chat',
+      includeKnowledge: options.includeKnowledge,
     });
     const rendered = (result as { rendered?: string | null })?.rendered;
     if (rendered && rendered.trim() && !rawInput.includes(INJECTION_MARK)) {
@@ -319,13 +386,15 @@ export function useTeamMemoryTurnExtract(messages: TMessage[], isRunning: boolea
     const attempts = [0, 500, 1500, 3000];
     const timers: ReturnType<typeof setTimeout>[] = [];
     for (const delay of attempts) {
-      timers.push(setTimeout(() => {
-        const current = messagesRef.current;
-        const exchange = findLastCompletedExchange(current);
-        if (!exchange || exchange.userText === lastExtractedRef.current) return;
-        lastExtractedRef.current = exchange.userText;
-        tryExtractExchange(exchange, `turn-end${delay ? `+${delay}ms` : ''}`);
-      }, delay));
+      timers.push(
+        setTimeout(() => {
+          const current = messagesRef.current;
+          const exchange = findLastCompletedExchange(current);
+          if (!exchange || exchange.userText === lastExtractedRef.current) return;
+          lastExtractedRef.current = exchange.userText;
+          tryExtractExchange(exchange, `turn-end${delay ? `+${delay}ms` : ''}`);
+        }, delay)
+      );
     }
     return () => timers.forEach(clearTimeout);
   }, [isRunning]); // 故意不依赖 messages（用 ref 取最新，避免每次消息更新重复触发边沿逻辑）

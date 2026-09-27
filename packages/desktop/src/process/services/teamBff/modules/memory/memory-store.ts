@@ -15,29 +15,43 @@ import { HybridLogicalClock } from '../shared/hlc.js';
 import { currentVerifiedAccountContext } from './account-request-context.js';
 import { accountRuntime } from './account-runtime.js';
 import { enqueueMemoryEmbedding } from './memory-embedding.js';
+import { markPersonalSyncDirty } from '../personalSync/dirty.js';
 
 const initialization = new Map<number, Promise<void>>();
 const clocks = new Map<number, HybridLogicalClock>();
-accountRuntime.registerCacheInvalidator(() => { initialization.clear(); clocks.clear(); });
+accountRuntime.registerCacheInvalidator(() => {
+  initialization.clear();
+  clocks.clear();
+});
 
 function nextHlc() {
   const generation = accountRuntime.currentGeneration();
   let clock = clocks.get(generation);
-  if (!clock) { clock = new HybridLogicalClock(); clocks.set(generation, clock); }
+  if (!clock) {
+    clock = new HybridLogicalClock();
+    clocks.set(generation, clock);
+  }
   return clock.now();
 }
 
 function observeHlc(remote: string) {
   const generation = accountRuntime.currentGeneration();
   let clock = clocks.get(generation);
-  if (!clock) { clock = new HybridLogicalClock(); clocks.set(generation, clock); }
+  if (!clock) {
+    clock = new HybridLogicalClock();
+    clocks.set(generation, clock);
+  }
   clock.observe(remote);
 }
 
-async function getDb() {
+async function initializeMemoryDatabase(identity: {
+  tenantId: string;
+  tenantMemberId: string;
+  activeTeamId: string | null;
+  resourceId: string | null;
+}) {
   const generation = accountRuntime.currentGeneration();
   const database = accountRuntime.database('memory');
-  const identity = currentVerifiedAccountContext();
   let pending = initialization.get(generation);
   if (!pending) {
     pending = (async () => {
@@ -79,17 +93,23 @@ async function getDb() {
           accessed_at INTEGER NOT NULL
         )
       `);
-      await database.execute('CREATE INDEX IF NOT EXISTS idx_memory_access_log_memory ON memory_access_log (memory_id, accessed_at DESC)');
+      await database.execute(
+        'CREATE INDEX IF NOT EXISTS idx_memory_access_log_memory ON memory_access_log (memory_id, accessed_at DESC)'
+      );
       await database.execute({
         sql: 'UPDATE memories SET tenant_id = ?, tenant_member_id = ? WHERE tenant_id IS NULL OR tenant_member_id IS NULL',
         args: [identity.tenantId, identity.tenantMemberId],
       });
       await database.execute(`UPDATE memories SET hlc = printf('%013d:000000', updated_at) WHERE hlc IS NULL`);
-      const latestHlc = await database.execute('SELECT hlc FROM memories WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1');
+      const latestHlc = await database.execute(
+        'SELECT hlc FROM memories WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1'
+      );
       if (latestHlc.rows[0]?.hlc) observeHlc(String(latestHlc.rows[0].hlc));
       await database.execute(`CREATE INDEX IF NOT EXISTS idx_memories_category ON memories (category)`);
       await database.execute(`CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories (scope)`);
-      await database.execute('CREATE INDEX IF NOT EXISTS idx_memories_owner_scope ON memories (tenant_id, tenant_member_id, context_team_id, scope, updated_at DESC)');
+      await database.execute(
+        'CREATE INDEX IF NOT EXISTS idx_memories_owner_scope ON memories (tenant_id, tenant_member_id, context_team_id, scope, updated_at DESC)'
+      );
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memory_runs (
           id TEXT PRIMARY KEY,
@@ -115,7 +135,9 @@ async function getDb() {
           WHERE tenant_id IS NULL OR tenant_member_id IS NULL OR active_team_id IS NULL OR resource_id IS NULL`,
         args: [identity.tenantId, identity.tenantMemberId, identity.activeTeamId, identity.resourceId],
       });
-      await database.execute('CREATE INDEX IF NOT EXISTS idx_memory_runs_owner ON memory_runs (tenant_id, tenant_member_id, active_team_id, created_at DESC)');
+      await database.execute(
+        'CREATE INDEX IF NOT EXISTS idx_memory_runs_owner ON memory_runs (tenant_id, tenant_member_id, active_team_id, created_at DESC)'
+      );
       // T3.1 记忆图谱两表（04 章 §5.1）：实体节点 + 关系边，与 memories 同 owner 隔离；
       // source_memory_ids 为 JSON 数组溯源，stale 软删（空溯源节点/边由 T3.4 级联标记）
       await database.execute(`
@@ -132,7 +154,9 @@ async function getDb() {
           updated_at INTEGER
         )
       `);
-      await database.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mgn_name ON memory_graph_nodes (tenant_id, tenant_member_id, type, name)`);
+      await database.execute(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_mgn_name ON memory_graph_nodes (tenant_id, tenant_member_id, type, name)`
+      );
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memory_graph_edges (
           id TEXT PRIMARY KEY,
@@ -148,8 +172,12 @@ async function getDb() {
           updated_at INTEGER
         )
       `);
-      await database.execute(`CREATE INDEX IF NOT EXISTS idx_mge_source ON memory_graph_edges (tenant_id, tenant_member_id, source_node_id)`);
-      await database.execute(`CREATE INDEX IF NOT EXISTS idx_mge_target ON memory_graph_edges (tenant_id, tenant_member_id, target_node_id)`);
+      await database.execute(
+        `CREATE INDEX IF NOT EXISTS idx_mge_source ON memory_graph_edges (tenant_id, tenant_member_id, source_node_id)`
+      );
+      await database.execute(
+        `CREATE INDEX IF NOT EXISTS idx_mge_target ON memory_graph_edges (tenant_id, tenant_member_id, target_node_id)`
+      );
       // T3.5 增量抽取水位：记录每条记忆已完成实体抽取的版本（memory_search_state 同款小表模式）
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memory_graph_state (
@@ -163,6 +191,21 @@ async function getDb() {
   await pending;
   if (accountRuntime.currentGeneration() !== generation) throw new Error('ACCOUNT_CONTEXT_CHANGED');
   return { database, identity };
+}
+
+async function getDb() {
+  const identity = currentVerifiedAccountContext();
+  const { database } = await initializeMemoryDatabase(identity);
+  return { database, identity };
+}
+/** Initialize personal backup tables without impersonating a Team context. */
+export async function getBackupStoreContext() {
+  const subject = accountRuntime.currentSubject();
+  if (!subject) throw new Error('ACCOUNT_RUNTIME_REQUIRED');
+  return initializeMemoryDatabase({
+    ...subject,
+    resourceId: subject.activeTeamId ? currentVerifiedAccountContext().resourceId : null,
+  });
 }
 
 /** 仅供本地可重建检索投影使用；调用方仍必须使用返回的已验证 identity 过滤。 */
@@ -227,7 +270,9 @@ export const CATEGORY_META: Record<MemoryCategory, { label: string; color: strin
 // 记忆条目 CRUD
 // ============================================================
 
-interface Row { [key: string]: unknown }
+interface Row {
+  [key: string]: unknown;
+}
 
 function toEntry(r: Row): MemoryEntry {
   return {
@@ -257,18 +302,34 @@ export async function listMemories(
   category?: MemoryCategory,
   search?: string,
   /** 作用域过滤：单个 scope 或数组。不传=全部。编程会话传 ['chat','code']，普通会话传 'chat' */
-  scope?: MemoryScope | MemoryScope[],
+  scope?: MemoryScope | MemoryScope[]
 ): Promise<MemoryEntry[]> {
   const { database, identity } = await getDb();
   let sql = 'SELECT * FROM memories';
   const args: (string | number)[] = [identity.tenantId, identity.tenantMemberId, identity.activeTeamId];
-  const where: string[] = ['tenant_id = ?', 'tenant_member_id = ?', '(context_team_id IS NULL OR context_team_id = ?)', 'deleted_at IS NULL'];
-  if (category) { where.push('category = ?'); args.push(category); }
-  if (search?.trim()) { where.push('(title LIKE ? OR content LIKE ?)'); args.push(`%${search}%`, `%${search}%`); }
+  const where: string[] = [
+    'tenant_id = ?',
+    'tenant_member_id = ?',
+    '(context_team_id IS NULL OR context_team_id = ?)',
+    'deleted_at IS NULL',
+  ];
+  if (category) {
+    where.push('category = ?');
+    args.push(category);
+  }
+  if (search?.trim()) {
+    where.push('(title LIKE ? OR content LIKE ?)');
+    args.push(`%${search}%`, `%${search}%`);
+  }
   if (scope) {
     const scopes = Array.isArray(scope) ? scope : [scope];
-    if (scopes.length === 1) { where.push('scope = ?'); args.push(scopes[0]); }
-    else if (scopes.length > 1) { where.push(`scope IN (${scopes.map(() => '?').join(',')})`); args.push(...scopes); }
+    if (scopes.length === 1) {
+      where.push('scope = ?');
+      args.push(scopes[0]);
+    } else if (scopes.length > 1) {
+      where.push(`scope IN (${scopes.map(() => '?').join(',')})`);
+      args.push(...scopes);
+    }
   }
   if (where.length) sql += ' WHERE ' + where.join(' AND ');
   sql += ' ORDER BY pinned DESC, updated_at DESC';
@@ -302,39 +363,95 @@ export async function createMemory(input: {
   const cat = input.category ?? 'fact';
   const src = input.source ?? 'manual';
   const scope = input.scope ?? 'chat';
-  const forgetAfter = typeof input.forgetAfter === 'number' && Number.isFinite(input.forgetAfter) ? input.forgetAfter : null;
+  const forgetAfter =
+    typeof input.forgetAfter === 'number' && Number.isFinite(input.forgetAfter) ? input.forgetAfter : null;
   const hlc = nextHlc();
   await database.execute({
     sql: `INSERT INTO memories
       (id, category, title, content, source, scope, pinned, tenant_id, tenant_member_id, context_team_id,
        version, hlc, deleted_at, forget_after, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, NULL, 1, ?, NULL, ?, ?, ?)`,
-    args: [id, cat, input.title, input.content, src, scope, identity.tenantId, identity.tenantMemberId, hlc, forgetAfter, now, now],
+    args: [
+      id,
+      cat,
+      input.title,
+      input.content,
+      src,
+      scope,
+      identity.tenantId,
+      identity.tenantMemberId,
+      hlc,
+      forgetAfter,
+      now,
+      now,
+    ],
   });
   // T1.8 写路径挂钩：入队异步批量 embedding（入队即返回，不阻塞写路径）
   enqueueMemoryEmbedding(id, `${input.title}\n${input.content}`);
-  return { id, category: cat, title: input.title, content: input.content, source: src, scope, pinned: false,
-    tenantId: identity.tenantId, tenantMemberId: identity.tenantMemberId, contextTeamId: null,
-    version: 1, hlc, deletedAt: null, importance: 0.5, lastRecalledAt: null, recallCount: 0, forgetAfter,
-    createdAt: now, updatedAt: now };
+  // 个人记忆云备份：写路径脏标记（未启用/未登录时为空操作）
+  markPersonalSyncDirty();
+  return {
+    id,
+    category: cat,
+    title: input.title,
+    content: input.content,
+    source: src,
+    scope,
+    pinned: false,
+    tenantId: identity.tenantId,
+    tenantMemberId: identity.tenantMemberId,
+    contextTeamId: null,
+    version: 1,
+    hlc,
+    deletedAt: null,
+    importance: 0.5,
+    lastRecalledAt: null,
+    recallCount: 0,
+    forgetAfter,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export async function updateMemory(
   id: string,
-  patch: Partial<Pick<MemoryEntry, 'category' | 'title' | 'content' | 'pinned' | 'scope' | 'importance' | 'forgetAfter'>>,
-  expectedVersion: number,
+  patch: Partial<
+    Pick<MemoryEntry, 'category' | 'title' | 'content' | 'pinned' | 'scope' | 'importance' | 'forgetAfter'>
+  >,
+  expectedVersion: number
 ): Promise<MemoryEntry> {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new Error('MEMORY_BASE_VERSION_REQUIRED');
   const { database, identity } = await getDb();
   const sets: string[] = [];
   const args: (string | number | null)[] = [];
-  if (patch.category !== undefined) { sets.push('category = ?'); args.push(patch.category); }
-  if (patch.title !== undefined) { sets.push('title = ?'); args.push(patch.title); }
-  if (patch.content !== undefined) { sets.push('content = ?'); args.push(patch.content); }
-  if (patch.pinned !== undefined) { sets.push('pinned = ?'); args.push(patch.pinned ? 1 : 0); }
-  if (patch.scope !== undefined) { sets.push('scope = ?'); args.push(patch.scope); }
-  if (patch.importance !== undefined) { sets.push('importance = ?'); args.push(Math.min(1, Math.max(0, patch.importance))); }
-  if (patch.forgetAfter !== undefined) { sets.push('forget_after = ?'); args.push(patch.forgetAfter); }
+  if (patch.category !== undefined) {
+    sets.push('category = ?');
+    args.push(patch.category);
+  }
+  if (patch.title !== undefined) {
+    sets.push('title = ?');
+    args.push(patch.title);
+  }
+  if (patch.content !== undefined) {
+    sets.push('content = ?');
+    args.push(patch.content);
+  }
+  if (patch.pinned !== undefined) {
+    sets.push('pinned = ?');
+    args.push(patch.pinned ? 1 : 0);
+  }
+  if (patch.scope !== undefined) {
+    sets.push('scope = ?');
+    args.push(patch.scope);
+  }
+  if (patch.importance !== undefined) {
+    sets.push('importance = ?');
+    args.push(Math.min(1, Math.max(0, patch.importance)));
+  }
+  if (patch.forgetAfter !== undefined) {
+    sets.push('forget_after = ?');
+    args.push(patch.forgetAfter);
+  }
   if (sets.length === 0) {
     const current = await getMemory(id);
     if (!current) throw new Error('MEMORY_NOT_FOUND');
@@ -342,11 +459,13 @@ export async function updateMemory(
   }
   const updatedAt = Date.now();
   const hlc = nextHlc();
-  sets.push('updated_at = ?', 'hlc = ?', 'version = version + 1'); args.push(updatedAt, hlc);
+  sets.push('updated_at = ?', 'hlc = ?', 'version = version + 1');
+  args.push(updatedAt, hlc);
   args.push(id, identity.tenantId, identity.tenantMemberId, identity.activeTeamId, expectedVersion);
   const result = await database.execute({
     sql: `UPDATE memories SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ? AND tenant_member_id = ?
-      AND (context_team_id IS NULL OR context_team_id = ?) AND deleted_at IS NULL AND version = ?`, args,
+      AND (context_team_id IS NULL OR context_team_id = ?) AND deleted_at IS NULL AND version = ?`,
+    args,
   });
   if (result.rowsAffected === 0) {
     if (await getMemory(id)) throw new Error('MEMORY_VERSION_CONFLICT');
@@ -355,6 +474,7 @@ export async function updateMemory(
   const updated = (await getMemory(id))!;
   // T1.8 写路径挂钩：标题/内容变更后重算向量（consolidate apply 路径同走这里）
   enqueueMemoryEmbedding(updated.id, `${updated.title}\n${updated.content}`);
+  markPersonalSyncDirty();
   // T3.4 图谱级联：编辑后旧实体溯源失效，从节点/边移除该记忆（fire-and-forget，不阻塞写路径；
   // 新一轮增量抽取会以新内容重新挂接）
   void import('./memory-graph.js').then((graph) => graph.removeMemoryFromGraph(id)).catch(() => {});
@@ -370,7 +490,16 @@ export async function deleteMemory(id: string, expectedVersion: number): Promise
     sql: `UPDATE memories SET deleted_at = ?, updated_at = ?, hlc = ?, version = version + 1
       WHERE id = ? AND tenant_id = ? AND tenant_member_id = ?
       AND (context_team_id IS NULL OR context_team_id = ?) AND deleted_at IS NULL AND version = ?`,
-    args: [deletedAt, deletedAt, hlc, id, identity.tenantId, identity.tenantMemberId, identity.activeTeamId, expectedVersion],
+    args: [
+      deletedAt,
+      deletedAt,
+      hlc,
+      id,
+      identity.tenantId,
+      identity.tenantMemberId,
+      identity.activeTeamId,
+      expectedVersion,
+    ],
   });
   if (result.rowsAffected === 0) {
     const row = await database.execute({
@@ -381,6 +510,7 @@ export async function deleteMemory(id: string, expectedVersion: number): Promise
     throw new Error('MEMORY_NOT_FOUND');
   }
   const row = await database.execute({ sql: 'SELECT * FROM memories WHERE id = ?', args: [id] });
+  markPersonalSyncDirty();
   // T3.4 图谱级联：软删后从相关节点/边 source_memory_ids 移除该 id，空溯源标 stale
   // （fire-and-forget 动态 import，避免循环依赖且不阻塞写路径）
   void import('./memory-graph.js').then((graph) => graph.removeMemoryFromGraph(id)).catch(() => {});
@@ -436,7 +566,7 @@ export async function recordMemoryAccess(ids: string[], accessedAt = Date.now())
         args: [id, id, MEMORY_ACCESS_LOG_CAP],
       },
     ]),
-    'write',
+    'write'
   );
 }
 
@@ -470,13 +600,15 @@ export async function listRuns(scope?: MemoryScope | 'all'): Promise<MemoryRun[]
   const ownerArgs = [identity.tenantId, identity.tenantMemberId, identity.activeTeamId, identity.resourceId];
   const result = scope
     ? await database.execute({
-      sql: `SELECT * FROM memory_runs WHERE tenant_id = ? AND tenant_member_id = ? AND active_team_id = ?
-        AND resource_id = ? AND scope = ? ORDER BY created_at DESC LIMIT 50`, args: [...ownerArgs, scope],
-    })
+        sql: `SELECT * FROM memory_runs WHERE tenant_id = ? AND tenant_member_id = ? AND active_team_id = ?
+        AND resource_id = ? AND scope = ? ORDER BY created_at DESC LIMIT 50`,
+        args: [...ownerArgs, scope],
+      })
     : await database.execute({
-      sql: `SELECT * FROM memory_runs WHERE tenant_id = ? AND tenant_member_id = ? AND active_team_id = ?
-        AND resource_id = ? ORDER BY created_at DESC LIMIT 50`, args: ownerArgs,
-    });
+        sql: `SELECT * FROM memory_runs WHERE tenant_id = ? AND tenant_member_id = ? AND active_team_id = ?
+        AND resource_id = ? ORDER BY created_at DESC LIMIT 50`,
+        args: ownerArgs,
+      });
   return result.rows.map((r) => {
     const row = r as Row;
     return {
@@ -500,8 +632,20 @@ export async function recordRun(run: Omit<MemoryRun, 'id' | 'createdAt'>): Promi
     sql: `INSERT INTO memory_runs
       (id, scope, status, summary, before_count, after_count, model_name, tenant_id, tenant_member_id, active_team_id, resource_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, run.scope, run.status, run.summary, run.beforeCount ?? null, run.afterCount ?? null, run.modelName,
-      identity.tenantId, identity.tenantMemberId, identity.activeTeamId, identity.resourceId, createdAt],
+    args: [
+      id,
+      run.scope,
+      run.status,
+      run.summary,
+      run.beforeCount ?? null,
+      run.afterCount ?? null,
+      run.modelName,
+      identity.tenantId,
+      identity.tenantMemberId,
+      identity.activeTeamId,
+      identity.resourceId,
+      createdAt,
+    ],
   });
   return { ...run, id, createdAt };
 }

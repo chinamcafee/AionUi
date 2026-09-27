@@ -27,8 +27,12 @@ interface ActiveAccountRuntime {
 type LifecycleHook = () => void | Promise<void>;
 
 function validateSubject(input: AccountSubject): Readonly<AccountSubject> {
-  if (!input || !UUID_PATTERN.test(input.tenantId) || !UUID_PATTERN.test(input.tenantMemberId) ||
-      (input.activeTeamId !== null && !UUID_PATTERN.test(input.activeTeamId))) {
+  if (
+    !input ||
+    !UUID_PATTERN.test(input.tenantId) ||
+    !UUID_PATTERN.test(input.tenantMemberId) ||
+    (input.activeTeamId !== null && !UUID_PATTERN.test(input.activeTeamId))
+  ) {
     throw new Error('ACCOUNT_SUBJECT_INVALID');
   }
   return Object.freeze({
@@ -42,7 +46,8 @@ async function ensurePrivateDirectory(directory: string) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const info = await lstat(directory);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('ACCOUNT_DIRECTORY_INVALID');
-  if (process.platform !== 'win32' && (info.mode & 0o077) !== 0) throw new Error('ACCOUNT_DIRECTORY_PERMISSIONS_INVALID');
+  if (process.platform !== 'win32' && (info.mode & 0o077) !== 0)
+    throw new Error('ACCOUNT_DIRECTORY_PERMISSIONS_INVALID');
 }
 
 function sameMember(left: AccountSubject, right: AccountSubject) {
@@ -142,10 +147,17 @@ export class AccountRuntimeManager {
     }
     this.generation += 1;
     this.active = {
-      subject, directory, generation: this.generation,
-      controller: new AbortController(), databases,
+      subject,
+      directory,
+      generation: this.generation,
+      controller: new AbortController(),
+      databases,
     };
-    return { status: teamSwitch ? 'team_switched' as const : 'activated' as const, generation: this.active.generation, directory };
+    return {
+      status: teamSwitch ? ('team_switched' as const) : ('activated' as const),
+      generation: this.active.generation,
+      directory,
+    };
   }
 
   private async stopActive(reason: string) {
@@ -164,7 +176,9 @@ export class AccountRuntimeManager {
     } catch (error) {
       hookError ??= error;
     }
-    await Promise.all(Object.values(previous.databases).map((database) => Promise.resolve(database.close()).catch(() => {})));
+    await Promise.all(
+      Object.values(previous.databases).map((database) => Promise.resolve(database.close()).catch(() => {}))
+    );
     this.generation += 1;
     if (hookError) throw hookError;
   }

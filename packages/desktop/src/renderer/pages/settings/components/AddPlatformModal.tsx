@@ -1,17 +1,18 @@
 import type { IProvider } from '@/common/config/storage';
-import {
-  type ModelImageInputChoice,
-  type ModelOpenAiApiModeChoice,
-  supportsOpenAiApiMode,
-  updateModelSettings,
-} from '@/common/utils/modelCapabilities';
+import { type ModelOpenAiApiModeChoice, supportsOpenAiApiMode } from '@/common/utils/modelCapabilities';
 import type { ProtocolDetectionResponse, ProtocolType } from '@/common/utils/protocolDetector';
 import { ipcBridge } from '@/common';
 import { uuid } from '@/common/utils';
 import { isGoogleApisHost } from '@/common/utils/urlValidation';
 import ModalHOC from '@/renderer/utils/ui/ModalHOC';
 import { Form, Input, Message, Select, Switch } from '@arco-design/web-react';
-import { Loading, PreviewOpen, Refresh, Search } from '@icon-park/react';
+import {
+  ModelCapabilitySwitchGroup,
+  buildCapabilityModelSettings,
+  DEFAULT_CAPABILITY_STATE,
+  type CapabilitySwitchState,
+} from './ModelCapabilitySwitches';
+import { Loading, Refresh, Search } from '@icon-park/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useModeModeList from '@renderer/hooks/agent/useModeModeList';
@@ -231,7 +232,7 @@ const AddPlatformModal = ModalHOC<{
 
   // new-api 每模型协议选择状态 / new-api per-model protocol selection state
   const [modelProtocol, setModelProtocol] = useState<string>('openai');
-  const [imageInput, setImageInput] = useState<ModelImageInputChoice>('auto');
+  const [capState, setCapState] = useState<CapabilitySwitchState>(DEFAULT_CAPABILITY_STATE);
   const [openAiApiMode, setOpenAiApiMode] = useState<ModelOpenAiApiModeChoice>('auto');
   const [isFullUrl, setIsFullUrl] = useState(false);
   const showOpenAiApiMode = supportsOpenAiApiMode(platform, modelProtocol);
@@ -307,7 +308,7 @@ const AddPlatformModal = ModalHOC<{
       protocolDetection.reset();
       setLastDetectionInput(null); // 重置检测记录 / Reset detection record
       setModelProtocol('openai'); // 重置协议选择 / Reset protocol selection
-      setImageInput('auto');
+      setCapState(DEFAULT_CAPABILITY_STATE);
       setOpenAiApiMode('auto');
       setIsFullUrl(false);
 
@@ -386,10 +387,12 @@ const AddPlatformModal = ModalHOC<{
         }
 
         const selectedModels: string[] = Array.isArray(values.model) ? values.model : [values.model];
-        provider.model_settings = updateModelSettings(
+
+        // 能力开关是逐模型设置的唯一入口：统一写入逐模型 model_settings
+        provider.model_settings = buildCapabilityModelSettings(
           undefined,
           selectedModels.filter(Boolean),
-          imageInput,
+          capState,
           showOpenAiApiMode ? openAiApiMode : 'auto'
         );
 
@@ -726,24 +729,9 @@ const AddPlatformModal = ModalHOC<{
             </Form.Item>
           )}
 
-          <Form.Item
-            label={
-              <span className='inline-flex items-center gap-5px'>
-                <PreviewOpen theme='outline' size='14' />
-                <span>{t('settings.imageInput')}</span>
-              </span>
-            }
-            extra={t('settings.imageInputTip')}
-          >
-            <Select
-              value={imageInput}
-              onChange={(value) => setImageInput(value as ModelImageInputChoice)}
-              options={[
-                { label: t('settings.imageInputAuto'), value: 'auto' },
-                { label: t('settings.imageInputSupported'), value: 'supported' },
-                { label: t('settings.imageInputUnsupported'), value: 'unsupported' },
-              ]}
-            />
+          {/* 模型能力（视觉理解开关即图片输入能力，不再单独提供视觉输入下拉） */}
+          <Form.Item label={t('settings.modelCapability.title')}>
+            <ModelCapabilitySwitchGroup value={capState} onChange={setCapState} />
           </Form.Item>
 
           {showOpenAiApiMode && (

@@ -3,11 +3,25 @@
 // 失败重试（jobId:retry）/终止确认（jobId:cancel）；可见性 personal/team 与密级选择。
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Button, Drawer, Message, Popconfirm, Progress, Radio, Select, Space, Typography, Upload } from '@arco-design/web-react';
+import {
+  Button,
+  Drawer,
+  Message,
+  Popconfirm,
+  Progress,
+  Radio,
+  Select,
+  Space,
+  Typography,
+  Upload,
+} from '@arco-design/web-react';
 import { IconDelete, IconRefresh } from '@arco-design/web-react/icon';
 import {
-  KnowledgeUploadError, uploadKnowledgeFile,
-  type CompletedKnowledgeUpload, type KnowledgeClassification, type KnowledgeVisibility,
+  KnowledgeUploadError,
+  uploadKnowledgeFile,
+  type CompletedKnowledgeUpload,
+  type KnowledgeClassification,
+  type KnowledgeVisibility,
 } from '@/renderer/services/knowledge/upload';
 import { useUploadProgress } from '@/renderer/hooks/knowledge/useUploadProgress';
 import { teamBffBaseUrl } from '@/renderer/api/teamClient';
@@ -30,31 +44,39 @@ export const KnowledgeUploadPanel: React.FC<{
   const [job, setJob] = useState<CompletedKnowledgeUpload | null>(null);
   const [pollGeneration, setPollGeneration] = useState(0);
   const cancelRef = useRef<AbortController | null>(null);
-  const { progress, status, doneStats, errorMsg, percent, stage } = useUploadProgress(job?.ingestionJobId ?? null, pollGeneration);
+  const { progress, status, doneStats, errorMsg, percent, stage } = useUploadProgress(
+    job?.ingestionJobId ?? null,
+    pollGeneration
+  );
 
-  const handleFiles = useCallback(async (files: File[]) => {
-    const file = files[0];
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-    setJob(null);
-    cancelRef.current = new AbortController();
-    try {
-      const completed = await uploadKnowledgeFile(file, {
-        visibility, classification, signal: cancelRef.current.signal,
-      });
-      setJob(completed);
-      setPollGeneration((g) => g + 1);
-    } catch (error) {
-      if ((error as Error)?.name === 'AbortError') {
-        setUploadError('已取消上传');
-      } else {
-        setUploadError(error instanceof KnowledgeUploadError ? error.code : String(error));
+  const handleFiles = useCallback(
+    async (files: File[]) => {
+      const file = files[0];
+      if (!file) return;
+      setUploading(true);
+      setUploadError(null);
+      setJob(null);
+      cancelRef.current = new AbortController();
+      try {
+        const completed = await uploadKnowledgeFile(file, {
+          visibility,
+          classification,
+          signal: cancelRef.current.signal,
+        });
+        setJob(completed);
+        setPollGeneration((g) => g + 1);
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') {
+          setUploadError('已取消上传');
+        } else {
+          setUploadError(error instanceof KnowledgeUploadError ? error.code : String(error));
+        }
+      } finally {
+        setUploading(false);
       }
-    } finally {
-      setUploading(false);
-    }
-  }, [visibility, classification]);
+    },
+    [visibility, classification]
+  );
 
   const retryJob = useCallback(async () => {
     if (!job) return;
@@ -68,33 +90,44 @@ export const KnowledgeUploadPanel: React.FC<{
     if (!job) return;
     const base = teamBffBaseUrl();
     if (!base) return;
-    await fetch(`${base}/teamapi/knowledge/jobs/${job.ingestionJobId}/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    await fetch(`${base}/teamapi/knowledge/jobs/${job.ingestionJobId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
   }, [job]);
 
   return (
-    <Drawer
-      title='上传到知识库'
-      visible={visible}
-      onCancel={onClose}
-      width={420}
-      footer={null}
-    >
+    <Drawer title='上传到知识库' visible={visible} onCancel={onClose} width={420} footer={null}>
       <Space direction='vertical' size='large' style={{ width: '100%' }}>
         <div>
-          <Typography.Text type='secondary' size='small'>可见范围</Typography.Text>
+          <Typography.Text type='secondary' size='small'>
+            可见范围
+          </Typography.Text>
           <div>
             <Radio.Group
               type='button'
               value={visibility}
               onChange={(v) => setVisibility(v as KnowledgeVisibility)}
-              options={[{ label: '个人知识库', value: 'personal' }, { label: '团队知识库（共享）', value: 'team' }]}
+              options={[
+                { label: '个人知识库', value: 'personal' },
+                { label: '团队知识库（共享）', value: 'team' },
+              ]}
             />
           </div>
         </div>
         <div>
-          <Typography.Text type='secondary' size='small'>密级</Typography.Text>
+          <Typography.Text type='secondary' size='small'>
+            密级
+          </Typography.Text>
           <div>
-            <Select size='small' style={{ width: 160 }} value={classification} options={CLASSIFICATIONS} onChange={(v) => setClassification(v)} />
+            <Select
+              size='small'
+              style={{ width: 160 }}
+              value={classification}
+              options={CLASSIFICATIONS}
+              onChange={(v) => setClassification(v)}
+            />
           </div>
         </div>
 
@@ -105,7 +138,9 @@ export const KnowledgeUploadPanel: React.FC<{
           autoUpload={false}
           showFileList={false}
           disabled={uploading || status === 'building'}
-          onChange={(_, files) => { void handleFiles(files.map((f) => f.originFile as File).filter(Boolean)); }}
+          onChange={(_, files) => {
+            void handleFiles(files.map((f) => f.originFile as File).filter(Boolean));
+          }}
           customRequest={() => Promise.resolve()}
         />
 
@@ -115,7 +150,10 @@ export const KnowledgeUploadPanel: React.FC<{
         {job && (
           <div>
             <Typography.Text bold>摄入任务 {stage}</Typography.Text>
-            <Progress percent={percent} status={status === 'failed' ? 'error' : status === 'done' ? 'success' : 'normal'} />
+            <Progress
+              percent={percent}
+              status={status === 'failed' ? 'error' : status === 'done' ? 'success' : 'normal'}
+            />
             <div style={{ maxHeight: 160, overflow: 'auto', fontSize: 12, color: 'var(--color-text-3)' }}>
               {progress.map((entry, index) => (
                 <div key={index}>
@@ -126,17 +164,24 @@ export const KnowledgeUploadPanel: React.FC<{
             {status === 'failed' && (
               <Space style={{ marginTop: 8 }}>
                 <Typography.Text type='error'>{errorMsg}</Typography.Text>
-                <Button size='mini' icon={<IconRefresh />} onClick={() => void retryJob()}>重试</Button>
+                <Button size='mini' icon={<IconRefresh />} onClick={() => void retryJob()}>
+                  重试
+                </Button>
               </Space>
             )}
             {status === 'building' && (
               <Popconfirm title='确认终止摄入任务？' onOk={() => void cancelJob()}>
-                <Button size='mini' status='danger' icon={<IconDelete />}>终止</Button>
+                <Button size='mini' status='danger' icon={<IconDelete />}>
+                  终止
+                </Button>
               </Popconfirm>
             )}
             {status === 'done' && doneStats && (
               <Typography.Text type='success' size='small'>
-                完成：{Object.entries(doneStats).map(([key, value]) => `${key}=${String(value)}`).join(' · ')}
+                完成：
+                {Object.entries(doneStats)
+                  .map(([key, value]) => `${key}=${String(value)}`)
+                  .join(' · ')}
               </Typography.Text>
             )}
           </div>

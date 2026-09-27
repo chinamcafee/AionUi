@@ -39,7 +39,7 @@ describe('/teamapi/agent-tools/invoke 校验（无账号态）', () => {
 
   it('GET /agent-tools 返回工具清单', async () => {
     const response = await app.request('/agent-tools');
-    const payload = await response.json() as { data: { tools: string[] } };
+    const payload = (await response.json()) as { data: { tools: string[] } };
     expect(payload.data.tools).toEqual([...KNOWLEDGE_AGENT_TOOLS]);
   });
 });

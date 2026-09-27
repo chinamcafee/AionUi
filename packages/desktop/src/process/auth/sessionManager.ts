@@ -6,13 +6,7 @@ import { createPkceAttempt, parseAuthorizationCallback, type PkceAttempt } from 
 const MAX_RESPONSE_BYTES = 64 * 1024;
 export const AIONUI_REDIRECT_URI = 'aionui://oauth/callback';
 
-export type AuthPhase =
-  | 'signed_out'
-  | 'authorizing'
-  | 'exchanging'
-  | 'authenticated'
-  | 'refresh_available'
-  | 'error';
+export type AuthPhase = 'signed_out' | 'authorizing' | 'exchanging' | 'authenticated' | 'refresh_available' | 'error';
 
 export interface AuthStatus {
   phase: AuthPhase;
@@ -31,8 +25,12 @@ function validatedHttpUrl(raw: string, name: string): URL {
     throw new Error(`${name}_INVALID`);
   }
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(value.hostname);
-  if (value.username || value.password || value.hash ||
-      (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))) {
+  if (
+    value.username ||
+    value.password ||
+    value.hash ||
+    (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))
+  ) {
     throw new Error(`${name}_INVALID`);
   }
   return value;
@@ -68,17 +66,30 @@ async function boundedJson(response: Response): Promise<any> {
 
 function parseTokenExchange(raw: any) {
   const value = raw?.data;
-  if (!value || typeof value !== 'object' ||
-      typeof value.refreshToken !== 'string' || value.refreshToken.length < 32 || value.refreshToken.length > 4096 ||
-      typeof value.accessToken !== 'string' || value.accessToken.length < 32 || value.accessToken.length > 4096 ||
-      typeof value.deviceId !== 'string' || !value.deviceId ||
-      typeof value.expiresAt !== 'string' || !Number.isFinite(Date.parse(value.expiresAt)) ||
-      typeof value.accessExpiresAt !== 'string' || !Number.isFinite(Date.parse(value.accessExpiresAt))) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    typeof value.refreshToken !== 'string' ||
+    value.refreshToken.length < 32 ||
+    value.refreshToken.length > 4096 ||
+    typeof value.accessToken !== 'string' ||
+    value.accessToken.length < 32 ||
+    value.accessToken.length > 4096 ||
+    typeof value.deviceId !== 'string' ||
+    !value.deviceId ||
+    typeof value.expiresAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.expiresAt)) ||
+    typeof value.accessExpiresAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.accessExpiresAt))
+  ) {
     throw new Error('AUTH_RESPONSE_INVALID');
   }
   return {
-    refreshToken: value.refreshToken, accessToken: value.accessToken, deviceId: value.deviceId,
-    expiresAt: value.expiresAt, accessExpiresAt: value.accessExpiresAt,
+    refreshToken: value.refreshToken,
+    accessToken: value.accessToken,
+    deviceId: value.deviceId,
+    expiresAt: value.expiresAt,
+    accessExpiresAt: value.accessExpiresAt,
   };
 }
 
@@ -105,14 +116,19 @@ export class ElectronAuthSessionManager {
   private readonly now: () => number;
   private readonly onStatus: (status: AuthStatus) => void;
   private attempt: PkceAttempt | null = null;
-  private accessCredentials: { accessToken: string; deviceId: string; expiresAt: string; accessExpiresAt: string } | null = null;
+  private accessCredentials: {
+    accessToken: string;
+    deviceId: string;
+    expiresAt: string;
+    accessExpiresAt: string;
+  } | null = null;
   private status: AuthStatus = { phase: 'signed_out', hasRefreshToken: false };
 
   constructor(deps: SessionManagerDeps) {
     this.teamServerBaseUrl = validatedHttpUrl(deps.teamServerBaseUrl, 'TEAM_SERVER_BASE_URL');
     this.authorizationPageUrl = validatedHttpUrl(
       deps.authorizationPageUrl ?? 'http://127.0.0.1:30190/electron/authorize',
-      'TEAM_AUTHORIZATION_PAGE_URL',
+      'TEAM_AUTHORIZATION_PAGE_URL'
     );
     if (this.teamServerBaseUrl.pathname !== '/' || this.teamServerBaseUrl.search) {
       throw new Error('TEAM_SERVER_BASE_URL_INVALID');
@@ -164,7 +180,11 @@ export class ElectronAuthSessionManager {
       return this.emit({ phase: 'authorizing', hasRefreshToken: await this.hasRefreshToken() });
     } catch {
       this.attempt = null;
-      this.emit({ phase: 'error', hasRefreshToken: await this.hasRefreshToken(), errorCode: 'AUTH_BROWSER_OPEN_FAILED' });
+      this.emit({
+        phase: 'error',
+        hasRefreshToken: await this.hasRefreshToken(),
+        errorCode: 'AUTH_BROWSER_OPEN_FAILED',
+      });
       throw new Error('AUTH_BROWSER_OPEN_FAILED');
     }
   }
@@ -183,34 +203,49 @@ export class ElectronAuthSessionManager {
     try {
       const endpoint = new URL('/api/v1/auth/electron/token', this.teamServerBaseUrl);
       const response = await this.fetcher(endpoint, {
-        method: 'POST', redirect: 'error', cache: 'no-store',
+        method: 'POST',
+        redirect: 'error',
+        cache: 'no-store',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code, clientId: this.clientId, redirectUri: this.redirectUri, codeVerifier: attempt.codeVerifier,
+          code,
+          clientId: this.clientId,
+          redirectUri: this.redirectUri,
+          codeVerifier: attempt.codeVerifier,
         }),
       });
-      if (!response.ok) throw new Error(response.status === 401 ? 'AUTHORIZATION_CODE_INVALID' : 'AUTH_EXCHANGE_FAILED');
+      if (!response.ok)
+        throw new Error(response.status === 401 ? 'AUTHORIZATION_CODE_INVALID' : 'AUTH_EXCHANGE_FAILED');
       const credentials = parseTokenExchange(await boundedJson(response));
       await this.refreshStore.set(credentials.refreshToken);
       this.accessCredentials = {
-        accessToken: credentials.accessToken, deviceId: credentials.deviceId,
-        expiresAt: credentials.expiresAt, accessExpiresAt: credentials.accessExpiresAt,
+        accessToken: credentials.accessToken,
+        deviceId: credentials.deviceId,
+        expiresAt: credentials.expiresAt,
+        accessExpiresAt: credentials.accessExpiresAt,
       };
       return this.emit({
-        phase: 'authenticated', hasRefreshToken: true, deviceId: credentials.deviceId,
-        expiresAt: credentials.expiresAt, accessExpiresAt: credentials.accessExpiresAt,
+        phase: 'authenticated',
+        hasRefreshToken: true,
+        deviceId: credentials.deviceId,
+        expiresAt: credentials.expiresAt,
+        accessExpiresAt: credentials.accessExpiresAt,
       });
     } catch (error) {
       this.accessCredentials = null;
-      const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,80}$/.test(error.message)
-        ? error.message
-        : 'AUTH_EXCHANGE_FAILED';
+      const code =
+        error instanceof Error && /^[A-Z][A-Z0-9_]{2,80}$/.test(error.message) ? error.message : 'AUTH_EXCHANGE_FAILED';
       this.emit({ phase: 'error', hasRefreshToken: await this.hasRefreshToken(), errorCode: code });
-      throw new Error(code);
+      throw new Error(code, { cause: error });
     }
   }
 
-  takeAccessCredentials(): { accessToken: string; deviceId: string; expiresAt: string; accessExpiresAt: string } | null {
+  takeAccessCredentials(): {
+    accessToken: string;
+    deviceId: string;
+    expiresAt: string;
+    accessExpiresAt: string;
+  } | null {
     const credentials = this.accessCredentials;
     this.accessCredentials = null;
     return credentials ? { ...credentials } : null;
@@ -224,8 +259,11 @@ export class ElectronAuthSessionManager {
     const credentials = parseTokenExchange({ data: rawCredentials });
     await this.refreshStore.set(credentials.refreshToken);
     this.emit({
-      phase: 'authenticated', hasRefreshToken: true, deviceId: credentials.deviceId,
-      expiresAt: credentials.expiresAt, accessExpiresAt: credentials.accessExpiresAt,
+      phase: 'authenticated',
+      hasRefreshToken: true,
+      deviceId: credentials.deviceId,
+      expiresAt: credentials.expiresAt,
+      accessExpiresAt: credentials.accessExpiresAt,
     });
   }
 

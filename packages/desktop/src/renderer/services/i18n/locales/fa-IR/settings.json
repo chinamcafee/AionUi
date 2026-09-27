@@ -412,6 +412,18 @@
   "imageInputSupported": "فعال‌شده در پیکربندی",
   "imageInputUnsupported": "غیرفعال‌شده در پیکربندی",
   "imageInputTip": "حالت خودکار از تشخیص قابلیت کاتالوگ استفاده می‌کند. فقط برای بازنویسی، آن را دستی فعال یا غیرفعال کنید.",
+  "modelCapability": {
+    "title": "قابلیت‌های مدل",
+    "text": "متن",
+    "vision": "بینایی",
+    "embedding": "جاسازی",
+    "textLabel": "مدل متنی",
+    "textDesc": "گفتگو و تولید متن",
+    "visionLabel": "درک تصویری",
+    "visionDesc": "ورودی و درک تصویر",
+    "embeddingLabel": "مدل جاسازی",
+    "embeddingDesc": "فقط برای بازیابی برداری"
+  },
   "openAiApiMode": "API درخواست OpenAI",
   "openAiApiModeAuto": "API · خودکار",
   "openAiApiModeChatCompletions": "Chat Completions",

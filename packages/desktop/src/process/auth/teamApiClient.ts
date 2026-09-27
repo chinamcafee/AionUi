@@ -15,8 +15,14 @@ export function validatedTeamServerBaseUrl(raw: string): URL {
     throw new Error('TEAM_SERVER_BASE_URL_INVALID');
   }
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(value.hostname);
-  if (value.username || value.password || value.hash || value.search || value.pathname !== '/' ||
-      (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))) {
+  if (
+    value.username ||
+    value.password ||
+    value.hash ||
+    value.search ||
+    value.pathname !== '/' ||
+    (value.protocol !== 'https:' && !(loopback && value.protocol === 'http:'))
+  ) {
     throw new Error('TEAM_SERVER_BASE_URL_INVALID');
   }
   return value;
@@ -62,15 +68,26 @@ export interface ElectronCredentials {
 
 export function parseCredentials(raw: any): ElectronCredentials {
   const data = raw?.data;
-  if (!data || typeof data !== 'object' || !validToken(data.refreshToken) || !validToken(data.accessToken) ||
-      typeof data.deviceId !== 'string' || !data.deviceId ||
-      typeof data.expiresAt !== 'string' || !Number.isFinite(Date.parse(data.expiresAt)) ||
-      typeof data.accessExpiresAt !== 'string' || !Number.isFinite(Date.parse(data.accessExpiresAt))) {
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !validToken(data.refreshToken) ||
+    !validToken(data.accessToken) ||
+    typeof data.deviceId !== 'string' ||
+    !data.deviceId ||
+    typeof data.expiresAt !== 'string' ||
+    !Number.isFinite(Date.parse(data.expiresAt)) ||
+    typeof data.accessExpiresAt !== 'string' ||
+    !Number.isFinite(Date.parse(data.accessExpiresAt))
+  ) {
     throw new Error('TEAM_API_RESPONSE_INVALID');
   }
   return {
-    refreshToken: data.refreshToken, accessToken: data.accessToken, deviceId: data.deviceId,
-    expiresAt: data.expiresAt, accessExpiresAt: data.accessExpiresAt,
+    refreshToken: data.refreshToken,
+    accessToken: data.accessToken,
+    deviceId: data.deviceId,
+    expiresAt: data.expiresAt,
+    accessExpiresAt: data.accessExpiresAt,
   };
 }
 
@@ -98,28 +115,55 @@ export interface SessionBootstrap {
   activeTeam: ReturnType<typeof parseTeam> | null;
   teams: ReturnType<typeof parseTeam>[];
   permissions: string[];
+  tenantCapabilities?: string[];
   versions: Record<'tenantMembership' | 'teamMembership' | 'tenantPolicy' | 'teamPolicy', number>;
   features: Record<string, boolean>;
   session: { id: string; deviceId: string; expiresAt: string };
 }
 
 export function parseBootstrap(raw: any): SessionBootstrap {
-  if (!raw || typeof raw !== 'object' || !['tenant_required', 'team_required', 'membership_suspended', 'ready'].includes(raw.state) ||
-      !raw.user || typeof raw.user !== 'object' || !raw.session || typeof raw.session !== 'object' ||
-      !Array.isArray(raw.teams) || !Array.isArray(raw.permissions) || !raw.versions || typeof raw.versions !== 'object' ||
-      !raw.features || typeof raw.features !== 'object') {
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    !['tenant_required', 'team_required', 'membership_suspended', 'ready'].includes(raw.state) ||
+    !raw.user ||
+    typeof raw.user !== 'object' ||
+    !raw.session ||
+    typeof raw.session !== 'object' ||
+    !Array.isArray(raw.teams) ||
+    !Array.isArray(raw.permissions) ||
+    !raw.versions ||
+    typeof raw.versions !== 'object' ||
+    !raw.features ||
+    typeof raw.features !== 'object'
+  ) {
     throw new Error('SESSION_BOOTSTRAP_INVALID');
   }
-  const tenant = raw.tenant === null ? null : {
-    id: stringField(raw.tenant?.id, 'TENANT'),
-    name: stringField(raw.tenant?.name, 'TENANT'),
-    tenantMemberId: stringField(raw.tenant?.tenantMemberId, 'TENANT'),
-    tenantRole: stringField(raw.tenant?.tenantRole, 'TENANT'),
-    status: raw.tenant?.status,
-  };
-  if (tenant && tenant.status !== 'active' && tenant.status !== 'suspended') throw new Error('SESSION_BOOTSTRAP_TENANT_INVALID');
+  const tenant =
+    raw.tenant === null
+      ? null
+      : {
+          id: stringField(raw.tenant?.id, 'TENANT'),
+          name: stringField(raw.tenant?.name, 'TENANT'),
+          tenantMemberId: stringField(raw.tenant?.tenantMemberId, 'TENANT'),
+          tenantRole: stringField(raw.tenant?.tenantRole, 'TENANT'),
+          status: raw.tenant?.status,
+        };
+  if (tenant && tenant.status !== 'active' && tenant.status !== 'suspended')
+    throw new Error('SESSION_BOOTSTRAP_TENANT_INVALID');
   const activeTeam = raw.activeTeam === null ? null : parseTeam(raw.activeTeam);
-  const permissions = [...new Set(raw.permissions.map((value: unknown) => stringField(value, 'PERMISSION')))] as string[];
+  const permissions = [
+    ...new Set(raw.permissions.map((value: unknown) => stringField(value, 'PERMISSION'))),
+  ] as string[];
+  if (
+    raw.tenantCapabilities !== undefined &&
+    (!Array.isArray(raw.tenantCapabilities) ||
+      raw.tenantCapabilities.some(
+        (v: unknown) =>
+          !['personal_escrow.manage', 'personal_escrow.approve', 'personal_escrow.audit'].includes(String(v))
+      ))
+  )
+    throw new Error('SESSION_BOOTSTRAP_CAPABILITY_INVALID');
   const versions = {} as SessionBootstrap['versions'];
   for (const key of ['tenantMembership', 'teamMembership', 'tenantPolicy', 'teamPolicy'] as const) {
     const value = raw.versions[key];
@@ -143,7 +187,13 @@ export function parseBootstrap(raw: any): SessionBootstrap {
       displayName: stringField(raw.user.displayName, 'USER'),
       avatarUrl: raw.user.avatarUrl === null ? null : stringField(raw.user.avatarUrl, 'USER'),
     },
-    tenant, activeTeam, teams: raw.teams.map(parseTeam), permissions, versions, features,
+    tenant,
+    activeTeam,
+    teams: raw.teams.map(parseTeam),
+    permissions,
+    ...(raw.tenantCapabilities === undefined ? {} : { tenantCapabilities: [...raw.tenantCapabilities] as string[] }),
+    versions,
+    features,
     session: {
       id: stringField(raw.session.id, 'SESSION'),
       deviceId: stringField(raw.session.deviceId, 'SESSION'),
@@ -173,8 +223,12 @@ export class TeamApiClient {
 
   constructor(deps: TeamApiClientDeps) {
     this.baseUrl = validatedTeamServerBaseUrl(deps.teamServerBaseUrl);
-    if (typeof deps.fetcher !== 'function' || typeof deps.readRefreshToken !== 'function' ||
-        typeof deps.persistRotatedCredentials !== 'function' || typeof deps.clearSession !== 'function') {
+    if (
+      typeof deps.fetcher !== 'function' ||
+      typeof deps.readRefreshToken !== 'function' ||
+      typeof deps.persistRotatedCredentials !== 'function' ||
+      typeof deps.clearSession !== 'function'
+    ) {
       throw new Error('TEAM_API_CLIENT_CONFIG_INVALID');
     }
     this.fetcher = deps.fetcher;
@@ -189,8 +243,12 @@ export class TeamApiClient {
   }
 
   installAccessCredentials(credentials: { accessToken: string; accessExpiresAt: string }) {
-    if (!credentials || !validToken(credentials.accessToken) ||
-        typeof credentials.accessExpiresAt !== 'string' || !Number.isFinite(Date.parse(credentials.accessExpiresAt))) {
+    if (
+      !credentials ||
+      !validToken(credentials.accessToken) ||
+      typeof credentials.accessExpiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(credentials.accessExpiresAt))
+    ) {
       throw new Error('ACCESS_CREDENTIALS_INVALID');
     }
     this.access = { token: credentials.accessToken, expiresAt: Date.parse(credentials.accessExpiresAt) };
@@ -208,7 +266,9 @@ export class TeamApiClient {
       let response: Response;
       try {
         response = await this.fetcher(new URL('/api/v1/auth/electron/refresh', this.baseUrl), {
-          method: 'POST', redirect: 'error', cache: 'no-store',
+          method: 'POST',
+          redirect: 'error',
+          cache: 'no-store',
           headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
         });
@@ -243,7 +303,10 @@ export class TeamApiClient {
     headers.set('Authorization', `Bearer ${token}`);
     try {
       return await this.fetcher(new URL(pathname, this.baseUrl), {
-        ...init, headers, redirect: 'error', cache: 'no-store',
+        ...init,
+        headers,
+        redirect: 'error',
+        cache: 'no-store',
       });
     } catch {
       throw new Error('TEAM_API_UNAVAILABLE');
@@ -273,25 +336,58 @@ export class TeamApiClient {
     const response = await this.authenticatedRequest('/api/v1/session/bootstrap');
     if (!response.ok) throw new Error(response.status === 403 ? 'SESSION_FORBIDDEN' : 'TEAM_API_UNAVAILABLE');
     const envelope = await readJson(response);
-    if (['accessToken', 'accessTokenExpiresAt', 'refreshToken', 'csrfToken']
-      .some((field) => envelope?.data?.[field] !== undefined)) {
+    if (
+      ['accessToken', 'accessTokenExpiresAt', 'refreshToken', 'csrfToken'].some(
+        (field) => envelope?.data?.[field] !== undefined
+      )
+    ) {
       throw new Error('SESSION_BOOTSTRAP_INVALID');
     }
     return parseBootstrap(envelope?.data);
   }
 
+  async listTenants(): Promise<{ id: string; name: string }[]> {
+    const response = await this.authenticatedRequest('/api/v1/me/tenants');
+    if (!response.ok) throw new Error('TEAM_API_UNAVAILABLE');
+    const body = await readJson(response);
+    const tenants = body?.data;
+    if (!Array.isArray(tenants) || tenants.some((t) => !UUID_PATTERN.test(t.id) || typeof t.name !== 'string'))
+      throw new Error('SESSION_BOOTSTRAP_INVALID');
+    return tenants.map((t) => ({ id: t.id, name: t.name }));
+  }
+  async switchActiveTenant(tenantId: string): Promise<SessionBootstrap> {
+    if (!UUID_PATTERN.test(tenantId)) throw new Error('ACTIVE_TENANT_INVALID');
+    const response = await this.authenticatedRequest('/api/v1/me/active-tenant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId }),
+    });
+    if (!response.ok) throw new Error('ACTIVE_TENANT_FORBIDDEN');
+    const envelope = await readJson(response);
+    if (!validToken(envelope?.data?.accessToken) || !Number.isFinite(Date.parse(envelope?.data?.accessTokenExpiresAt)))
+      throw new Error('SESSION_BOOTSTRAP_INVALID');
+    this.installAccessCredentials({
+      accessToken: envelope.data.accessToken,
+      accessExpiresAt: envelope.data.accessTokenExpiresAt,
+    });
+    return parseBootstrap(envelope.data);
+  }
   async switchActiveTeam(tenantId: string, teamId: string): Promise<SessionBootstrap> {
     for (const value of [tenantId, teamId]) {
       if (typeof value !== 'string' || !UUID_PATTERN.test(value)) throw new Error('ACTIVE_TEAM_INVALID');
     }
     const response = await this.authenticatedRequest('/api/v1/me/active-team', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tenantId, teamId }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, teamId }),
     });
     if (!response.ok) throw new Error(response.status === 403 ? 'ACTIVE_TEAM_FORBIDDEN' : 'TEAM_API_UNAVAILABLE');
     const envelope = await readJson(response);
-    if (!validToken(envelope?.data?.accessToken) ||
-        typeof envelope.data.accessTokenExpiresAt !== 'string' ||
-        !Number.isFinite(Date.parse(envelope.data.accessTokenExpiresAt))) {
+    if (
+      !validToken(envelope?.data?.accessToken) ||
+      typeof envelope.data.accessTokenExpiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(envelope.data.accessTokenExpiresAt))
+    ) {
       throw new Error('SESSION_BOOTSTRAP_INVALID');
     }
     this.installAccessCredentials({

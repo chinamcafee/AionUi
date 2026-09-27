@@ -40,7 +40,11 @@ export class TeamBffService {
 
   private gatewayAttachInvalidation(invalidation: {
     startTeamMemoryInvalidationStream: (input: {
-      baseUrl: URL; accessToken: string; tenantId: string; teamId: string; accountSignal: AbortSignal;
+      baseUrl: URL;
+      accessToken: string;
+      tenantId: string;
+      teamId: string;
+      accountSignal: AbortSignal;
     }) => void;
     stopTeamMemoryInvalidationStream: () => void;
   }) {
@@ -60,9 +64,17 @@ export class TeamBffService {
     this.config = new TeamConfigStore(path.join(root, 'config.json'));
     this.refreshStore = new SafeStorageRefreshTokenStore(
       deps.safeStorage,
-      path.join(root, 'auth', 'refresh-token.bin'),
+      path.join(root, 'auth', 'refresh-token.bin')
     );
     this.accountRuntime = new AccountRuntimeManager(path.join(deps.userDataPath, 'aionui-team-accounts'));
+    // 个人记忆云备份（E2EE 同步引擎）：vault 主密钥经 safeStorage 保护，随账户/团队状态激活或停用
+    void import('./modules/personalSync/service').then((personalSync) => {
+      personalSync.configurePersonalSync({
+        vaultKeyFilePath: personalSync.personalSyncVaultKeyPath(deps.userDataPath),
+        safeStorage: deps.safeStorage,
+        fetcher: deps.fetcher,
+      });
+    });
     // 团队记忆失效 SSE（T3.1）：网关配置成功即拉流，账号/团队切换自动停流重启
     void import('./modules/memory/team-memory-invalidation').then((invalidation) => {
       this.gatewayAttachInvalidation(invalidation);
@@ -70,16 +82,20 @@ export class TeamBffService {
     this.openExternal = deps.openExternal;
     this.fetcher = deps.fetcher ?? fetch.bind(globalThis);
     // 记忆模块 shim 绑定：上游单例 → 本服务实例（T2.1）
-    void import('./modules/memory/account-runtime').then(({ bindAccountRuntime }) => bindAccountRuntime(this.accountRuntime));
+    void import('./modules/memory/account-runtime').then(({ bindAccountRuntime }) =>
+      bindAccountRuntime(this.accountRuntime)
+    );
     void import('./modules/memory/team-gateway-runtime').then(({ bindTeamGateway }) => bindTeamGateway(this.gateway));
     void import('./modules/memory/memory-model-util').then(({ bindMemoryModelProvider }) =>
-      bindMemoryModelProvider(async () => (await this.config.get()).memoryModel ?? null));
+      bindMemoryModelProvider(async () => (await this.config.get()).memoryModel ?? null)
+    );
     // 记忆向量：云端 embedding 端点复用记忆模型配置（未配置则整体降级为词法检索，上游语义）
     void import('./modules/memory/memory-embedding').then(({ setCloudEmbeddingConfigResolver }) =>
       setCloudEmbeddingConfigResolver(async () => {
         const model = (await this.config.get()).memoryModel;
         return model ? { baseUrl: model.baseUrl, apiKey: model.apiKey, model: model.model, dimensions: 2048 } : null;
-      }));
+      })
+    );
   }
 
   onStatus(listener: (view: TeamSessionView) => void) {
@@ -117,7 +133,9 @@ export class TeamBffService {
         fetcher: this.fetcher,
         readRefreshToken: () => this.refreshStore.get(),
         persistRotatedCredentials: (credentials) => this.authManager!.persistRotatedCredentials(credentials),
-        clearSession: () => this.authManager!.logout(),
+        clearSession: async () => {
+          await this.authManager!.logout();
+        },
       });
       // 网关 401 自救：强制刷新 access token 并原地更新网关凭据（E-11）
       this.gateway.setTokenRefresher(async () => {
@@ -195,15 +213,32 @@ export class TeamBffService {
         tenantId: bootstrap.tenant.id,
         teamId: bootstrap.activeTeam.id,
       });
+    } else if (bootstrap.state === 'team_required' && bootstrap.tenant) {
+      this.gateway.clear();
+      await this.accountRuntime.activate({
+        tenantId: bootstrap.tenant.id,
+        tenantMemberId: bootstrap.tenant.tenantMemberId,
+        activeTeamId: null,
+      });
     } else {
       // 未选租户/团队或被停用：释放本地账号态
       this.gateway.clear();
       await this.accountRuntime.deactivate();
     }
+    await this.syncPersonalSyncLifecycle(bootstrap, apiClient);
     await this.emitStatus('authenticated');
     return bootstrap;
   }
 
+  async listTenants() {
+    const { apiClient } = await this.ensureManagers();
+    return apiClient.listTenants();
+  }
+  async switchTenant(tenantId: string): Promise<SessionBootstrap> {
+    const { apiClient } = await this.ensureManagers();
+    await apiClient.switchActiveTenant(tenantId);
+    return this.fetchBootstrap();
+  }
   async switchTeam(tenantId: string, teamId: string): Promise<SessionBootstrap> {
     const { apiClient } = await this.ensureManagers();
     const bootstrap = await apiClient.switchActiveTeam(tenantId, teamId);
@@ -222,11 +257,45 @@ export class TeamBffService {
         teamId: bootstrap.activeTeam.id,
       });
     }
+    await this.syncPersonalSyncLifecycle(bootstrap, apiClient);
     await this.emitStatus('authenticated');
     return bootstrap;
   }
 
+  /** 个人记忆云备份：账户/团队就绪即激活（含 deviceId 与令牌来源），否则停用。 */
+  private async syncPersonalSyncLifecycle(bootstrap: SessionBootstrap, apiClient: TeamApiClient) {
+    try {
+      const personalSync = await import('./modules/personalSync/service');
+      if (['ready', 'team_required'].includes(bootstrap.state) && bootstrap.tenant && bootstrap.session?.deviceId) {
+        const config = await this.config.get();
+        await personalSync.activatePersonalSync({
+          baseUrl: config.serverBaseUrl,
+          deviceId: bootstrap.session.deviceId,
+          userId: bootstrap.user.id,
+          tenantId: bootstrap.tenant.id,
+          getAccessToken: (forceRefresh) => apiClient.accessToken(forceRefresh),
+        });
+      } else {
+        personalSync.deactivatePersonalSync();
+      }
+    } catch (error) {
+      console.warn('[teamBff] personal sync lifecycle failed:', (error as Error)?.message ?? error);
+    }
+  }
+
   async logout() {
+    // 登出/切换前做一次尽力而为的备份冲刷（对齐上游 account-switch 触发）
+    try {
+      const personalSync = await import('./modules/personalSync/service');
+      if (this.apiClient) {
+        await personalSync.runPersonalSync('account-switch').catch((error) => {
+          console.warn('[teamBff] final personal sync failed:', (error as Error)?.message ?? error);
+        });
+      }
+      personalSync.deactivatePersonalSync();
+    } catch (error) {
+      console.warn('[teamBff] personal sync deactivate failed:', (error as Error)?.message ?? error);
+    }
     this.cachedBootstrap = null;
     this.gateway.clear();
     await this.accountRuntime.deactivate();

@@ -20,6 +20,7 @@ export interface TeamSessionBootstrap {
   activeTeam: TeamSessionTeam | null;
   teams: TeamSessionTeam[];
   permissions: string[];
+  tenantCapabilities?: string[];
   versions: Record<string, number>;
   features: Record<string, boolean>;
 }
@@ -145,4 +146,9 @@ export function useTeamAuth(): TeamAuthContextValue {
   const context = useContext(TeamAuthContext);
   if (!context) throw new Error('useTeamAuth must be used within a TeamAuthProvider');
   return context;
+}
+
+/** Optional read for components that may render outside the provider (e.g. isolated dom tests). */
+export function useTeamAuthOptional(): TeamAuthContextValue | null {
+  return useContext(TeamAuthContext);
 }

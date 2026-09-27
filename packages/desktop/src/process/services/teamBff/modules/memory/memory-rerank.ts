@@ -45,7 +45,11 @@ export interface RerankScoreEntry {
 /** 测试注入点：替换模型解析与 LLM 调用（默认走模型绑定 + AI SDK generateText） */
 export interface MemoryRerankHooks {
   resolveModel?: () => Promise<MemoryModelHandle>;
-  generateTextFn?: (args: { model: LanguageModel; prompt: string; abortSignal: AbortSignal }) => Promise<{ text: string }>;
+  generateTextFn?: (args: {
+    model: LanguageModel;
+    prompt: string;
+    abortSignal: AbortSignal;
+  }) => Promise<{ text: string }>;
 }
 let rerankHooks: MemoryRerankHooks = {};
 export function setMemoryRerankHooks(hooks: MemoryRerankHooks): void {
@@ -124,11 +128,19 @@ ${JSON.stringify(payload)}`;
 function extractJsonObject(text: string): unknown | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = (fenced ? fenced[1]! : text).trim();
-  try { return JSON.parse(candidate); } catch { /* 继续尝试子串提取 */ }
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    /* 继续尝试子串提取 */
+  }
   const start = candidate.indexOf('{');
   const end = candidate.lastIndexOf('}');
   if (start >= 0 && end > start) {
-    try { return JSON.parse(candidate.slice(start, end + 1)); } catch { return null; }
+    try {
+      return JSON.parse(candidate.slice(start, end + 1));
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -165,7 +177,7 @@ function blendRerankOrder(candidates: RerankableHit[], scores: Map<number, Reran
       index,
       finalScore: RERANK_BLEND * ((scores.get(index)?.score ?? 5) / 10) + (1 - RERANK_BLEND) * hit.score,
     }))
-    .sort((left, right) => right.finalScore - left.finalScore || left.index - right.index)
+    .toSorted((left, right) => right.finalScore - left.finalScore || left.index - right.index)
     .map((entry) => entry.index);
 }
 
@@ -182,7 +194,7 @@ export function blendRerankScores<T extends RerankableHit>(hits: T[], scores: Ma
 export async function rerankHits<T extends RerankableHit>(
   query: string,
   hits: T[],
-  options: { take?: number } = {},
+  options: { take?: number } = {}
 ): Promise<T[]> {
   const take = Math.max(1, options.take ?? RERANK_INJECTION_LIMIT);
   if (hits.length <= take) {
@@ -191,8 +203,7 @@ export async function rerankHits<T extends RerankableHit>(
   }
   const candidates = hits.slice(0, RERANK_CANDIDATE_LIMIT);
   const rest = hits.slice(RERANK_CANDIDATE_LIMIT);
-  const assemble = (order: number[]): T[] =>
-    [...order.map((index) => candidates[index]!), ...rest].slice(0, take);
+  const assemble = (order: number[]): T[] => [...order.map((index) => candidates[index]!), ...rest].slice(0, take);
 
   const cacheKey = rerankCacheKey(query, candidates);
   const cached = readRerankCache(cacheKey);

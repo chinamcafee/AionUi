@@ -15,8 +15,14 @@
  */
 import { generateText, type LanguageModel } from 'ai';
 import {
-  listMemories, listMemoryAccessLogs, updateMemory, deleteMemory, recordRun,
-  type MemoryCategory, type MemoryEntry, type MemoryScope,
+  listMemories,
+  listMemoryAccessLogs,
+  updateMemory,
+  deleteMemory,
+  recordRun,
+  type MemoryCategory,
+  type MemoryEntry,
+  type MemoryScope,
 } from './memory-store.js';
 import { buildRetentionCandidates } from './memory-retention.js';
 import { getMemoryModel } from './memory-model-util.js';
@@ -84,7 +90,10 @@ const SCOPE_LABEL: Record<ConsolidationScope, string> = {
   code: '编码记忆',
 };
 
-const CONSOLIDATE_PROMPT = (scopeLabel: string, memories: string) => `你是一个记忆整理助手。下面是用户的${scopeLabel}条目列表（JSON）。
+const CONSOLIDATE_PROMPT = (
+  scopeLabel: string,
+  memories: string
+) => `你是一个记忆整理助手。下面是用户的${scopeLabel}条目列表（JSON）。
 请输出可以直接执行的结构化整理计划，而不是只给建议文本。
 
 允许的操作：
@@ -128,7 +137,7 @@ ${memories}
 }
 如果无需整理，operations 返回空数组。`;
 
-const VALID_CATEGORIES: MemoryCategory[] = ['preference', 'fact', 'requirement', 'event'];
+const VALID_CATEGORIES: MemoryCategory[] = new Set(['preference', 'fact', 'requirement', 'event']);
 
 export function groupMemoriesByScope(all: MemoryEntry[]): Record<MemoryScope, MemoryEntry[]> {
   return {
@@ -145,7 +154,7 @@ export function dedupeByTitleWithinScope(all: MemoryEntry[]): {
   const removedIds: string[] = [];
   const mergePatches: Array<{ id: string; content: string }> = [];
 
-  const sorted = [...all].sort((a, b) => a.createdAt - b.createdAt);
+  const sorted = [...all].toSorted((a, b) => a.createdAt - b.createdAt);
   for (const m of sorted) {
     const key = m.title.trim().toLowerCase();
     const prev = seen.get(key);
@@ -202,7 +211,7 @@ function extractJsonObject(text: string): string {
 }
 
 function hasValidCategory(value: unknown): value is MemoryCategory {
-  return typeof value === 'string' && VALID_CATEGORIES.includes(value as MemoryCategory);
+  return typeof value === 'string' && VALID_CATEGORIES.has(value as MemoryCategory);
 }
 
 function opId(type: string, ids: string[]): string {
@@ -212,7 +221,7 @@ function opId(type: string, ids: string[]): string {
 export function parseConsolidationPlan(
   rawText: string,
   validIds: string[],
-  versions: Readonly<Record<string, number>> = {},
+  versions: Readonly<Record<string, number>> = {}
 ): ConsolidationPlan {
   const valid = new Set(validIds);
   try {
@@ -224,12 +233,15 @@ export function parseConsolidationPlan(
       const op = rawOp as Record<string, unknown>;
       if (op.type === 'merge') {
         const targetId = typeof op.targetId === 'string' ? op.targetId : '';
-        const sourceIds = Array.isArray(op.sourceIds) ? op.sourceIds.filter((id): id is string => typeof id === 'string') : [];
+        const sourceIds = Array.isArray(op.sourceIds)
+          ? op.sourceIds.filter((id): id is string => typeof id === 'string')
+          : [];
         const title = typeof op.title === 'string' ? op.title.trim() : '';
         const content = typeof op.content === 'string' ? op.content.trim() : '';
         const reason = typeof op.reason === 'string' ? op.reason.trim() : '合并重复或重叠记忆';
         const category = op.category === undefined ? undefined : op.category;
-        if (!valid.has(targetId) || sourceIds.length === 0 || sourceIds.some((id) => !valid.has(id) || id === targetId)) continue;
+        if (!valid.has(targetId) || sourceIds.length === 0 || sourceIds.some((id) => !valid.has(id) || id === targetId))
+          continue;
         if (!title || !content) continue;
         if (category !== undefined && !hasValidCategory(category)) continue;
         operations.push({
@@ -297,32 +309,45 @@ export async function applyConsolidationOperations(operations: ConsolidationOper
     if (op.type === 'merge') {
       if (!validIds.has(op.targetId) || op.sourceIds.some((id) => !validIds.has(id))) continue;
       if (op.category !== undefined && !hasValidCategory(op.category)) continue;
-      if (!op.targetBaseVersion || !op.sourceBaseVersions ||
-          current.get(op.targetId)?.version !== op.targetBaseVersion ||
-          op.sourceIds.some((id) => current.get(id)?.version !== op.sourceBaseVersions?.[id])) {
+      if (
+        !op.targetBaseVersion ||
+        !op.sourceBaseVersions ||
+        current.get(op.targetId)?.version !== op.targetBaseVersion ||
+        op.sourceIds.some((id) => current.get(id)?.version !== op.sourceBaseVersions?.[id])
+      ) {
         throw new Error('MEMORY_VERSION_CONFLICT');
       }
-      await updateMemory(op.targetId, {
-        title: op.title,
-        content: op.content,
-        ...(op.category ? { category: op.category } : {}),
-      }, op.targetBaseVersion);
+      await updateMemory(
+        op.targetId,
+        {
+          title: op.title,
+          content: op.content,
+          ...(op.category ? { category: op.category } : {}),
+        },
+        op.targetBaseVersion
+      );
       for (const id of op.sourceIds) await deleteMemory(id, op.sourceBaseVersions[id]);
       for (const id of op.sourceIds) validIds.delete(id);
       applied += 1;
     } else if (op.type === 'update') {
       if (!validIds.has(op.targetId)) continue;
       if (op.category !== undefined && !hasValidCategory(op.category)) continue;
-      if (!op.baseVersion || current.get(op.targetId)?.version !== op.baseVersion) throw new Error('MEMORY_VERSION_CONFLICT');
-      await updateMemory(op.targetId, {
-        ...(op.title ? { title: op.title } : {}),
-        ...(op.content ? { content: op.content } : {}),
-        ...(op.category ? { category: op.category } : {}),
-      }, op.baseVersion);
+      if (!op.baseVersion || current.get(op.targetId)?.version !== op.baseVersion)
+        throw new Error('MEMORY_VERSION_CONFLICT');
+      await updateMemory(
+        op.targetId,
+        {
+          ...(op.title ? { title: op.title } : {}),
+          ...(op.content ? { content: op.content } : {}),
+          ...(op.category ? { category: op.category } : {}),
+        },
+        op.baseVersion
+      );
       applied += 1;
     } else {
       if (!validIds.has(op.targetId)) continue;
-      if (!op.baseVersion || current.get(op.targetId)?.version !== op.baseVersion) throw new Error('MEMORY_VERSION_CONFLICT');
+      if (!op.baseVersion || current.get(op.targetId)?.version !== op.baseVersion)
+        throw new Error('MEMORY_VERSION_CONFLICT');
       await deleteMemory(op.targetId, op.baseVersion);
       validIds.delete(op.targetId);
       applied += 1;
@@ -337,11 +362,9 @@ export async function applyConsolidationOperations(operations: ConsolidationOper
 export async function consolidateMemories(
   scope: ConsolidationScope = 'all',
   mode: ConsolidationMode = 'auto',
-  options: { abortSignal?: AbortSignal } = {},
+  options: { abortSignal?: AbortSignal } = {}
 ): Promise<ConsolidateResult> {
-  const all = scope === 'all'
-    ? await listMemories()
-    : await listMemories(undefined, undefined, scope);
+  const all = scope === 'all' ? await listMemories() : await listMemories(undefined, undefined, scope);
   const beforeCount = all.length;
   const details: string[] = [];
 
@@ -355,17 +378,37 @@ export async function consolidateMemories(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await recordRun({ scope, status: 'failed', summary: msg, beforeCount, afterCount: null, modelName: null });
-    return { status: 'failed', summary: msg, beforeCount, afterCount: beforeCount, modelName: null, mode, operations: [], appliedCount: 0, details: [] };
+    return {
+      status: 'failed',
+      summary: msg,
+      beforeCount,
+      afterCount: beforeCount,
+      modelName: null,
+      mode,
+      operations: [],
+      appliedCount: 0,
+      details: [],
+    };
   }
 
   // 没有记忆可整理
   if (all.length === 0) {
     const summary = '当前没有记忆条目，无需整理。';
     await recordRun({ scope, status: 'skipped', summary, beforeCount: 0, afterCount: 0, modelName });
-    return { status: 'skipped', summary, beforeCount: 0, afterCount: 0, modelName, mode, operations: [], appliedCount: 0, details: [] };
+    return {
+      status: 'skipped',
+      summary,
+      beforeCount: 0,
+      afterCount: 0,
+      modelName,
+      mode,
+      operations: [],
+      appliedCount: 0,
+      details: [],
+    };
   }
 
-  const groups = scope === 'all' ? groupMemoriesByScope(all) : { [scope]: all } as Record<MemoryScope, MemoryEntry[]>;
+  const groups = scope === 'all' ? groupMemoriesByScope(all) : ({ [scope]: all } as Record<MemoryScope, MemoryEntry[]>);
   const scopeEntries = Object.entries(groups) as Array<[MemoryScope, MemoryEntry[]]>;
 
   const operations: ConsolidationOperation[] = [];
@@ -375,7 +418,13 @@ export async function consolidateMemories(
     for (const patch of merged.mergePatches) {
       const target = memories.find((m) => m.id === patch.id);
       if (!target) continue;
-      const sources = merged.removedIds.filter((id) => memories.find((m) => m.id === id)?.title.trim().toLowerCase() === target.title.trim().toLowerCase());
+      const sources = merged.removedIds.filter(
+        (id) =>
+          memories
+            .find((m) => m.id === id)
+            ?.title.trim()
+            .toLowerCase() === target.title.trim().toLowerCase()
+      );
       if (sources.length === 0) continue;
       operations.push({
         id: opId('merge-title', [target.id, ...sources]),
@@ -383,14 +432,17 @@ export async function consolidateMemories(
         targetId: target.id,
         targetBaseVersion: target.version,
         sourceIds: sources,
-        sourceBaseVersions: Object.fromEntries(sources.map((id) => [id, memories.find((memory) => memory.id === id)!.version])),
+        sourceBaseVersions: Object.fromEntries(
+          sources.map((id) => [id, memories.find((memory) => memory.id === id)!.version])
+        ),
         title: target.title,
         content: patch.content,
         category: target.category,
         reason: '标题完全相同，自动生成合并操作',
       });
     }
-    if (merged.removedIds.length > 0) details.push(`${SCOPE_LABEL[groupScope]}本地发现 ${merged.removedIds.length} 条标题完全重复的条目。`);
+    if (merged.removedIds.length > 0)
+      details.push(`${SCOPE_LABEL[groupScope]}本地发现 ${merged.removedIds.length} 条标题完全重复的条目。`);
   }
   const afterCount = beforeCount;
 
@@ -403,7 +455,9 @@ export async function consolidateMemories(
     for (const [groupScope, memories] of scopeEntries) {
       if (memories.length === 0) continue;
       try {
-        const payload = JSON.stringify(memories.map(({ id, title, content, category, scope }) => ({ id, title, content, category, scope })));
+        const payload = JSON.stringify(
+          memories.map(({ id, title, content, category, scope }) => ({ id, title, content, category, scope }))
+        );
         const res = await generateText({
           model,
           prompt: CONSOLIDATE_PROMPT(SCOPE_LABEL[groupScope], payload),
@@ -412,11 +466,13 @@ export async function consolidateMemories(
         const plan = parseConsolidationPlan(
           res.text,
           memories.map((m) => m.id),
-          Object.fromEntries(memories.map((memory) => [memory.id, memory.version])),
+          Object.fromEntries(memories.map((memory) => [memory.id, memory.version]))
         );
         operations.push(...plan.operations);
         summaries.push(`${SCOPE_LABEL[groupScope]}：${plan.summary}`);
-        details.push(`已通过绑定模型「${modelName}」生成${SCOPE_LABEL[groupScope]}整理计划（${plan.operations.length} 项操作）。`);
+        details.push(
+          `已通过绑定模型「${modelName}」生成${SCOPE_LABEL[groupScope]}整理计划（${plan.operations.length} 项操作）。`
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         summaries.push(`${SCOPE_LABEL[groupScope]} LLM 调用失败：${msg}。已保留本地去重结果。`);
@@ -430,8 +486,9 @@ export async function consolidateMemories(
     const candidateScopeEntries = scopeEntries.flatMap(([, memories]) => memories);
     const accessLogs = await listMemoryAccessLogs(candidateScopeEntries.map((memory) => memory.id));
     const handledIds = new Set(operations.flatMap((op) => [op.targetId, ...(op.type === 'merge' ? op.sourceIds : [])]));
-    const retentionCandidates = buildRetentionCandidates(candidateScopeEntries, accessLogs)
-      .filter((candidate) => !handledIds.has(candidate.targetId));
+    const retentionCandidates = buildRetentionCandidates(candidateScopeEntries, accessLogs).filter(
+      (candidate) => !handledIds.has(candidate.targetId)
+    );
     for (const candidate of retentionCandidates) {
       operations.push({
         id: `retention-${candidate.targetId}`,
@@ -446,11 +503,26 @@ export async function consolidateMemories(
     }
   }
 
-  const appliedCount = mode === 'auto' ? await applyConsolidationOperations(operations) : 0;  const finalCount = mode === 'auto' ? (await listMemories(undefined, undefined, scope === 'all' ? undefined : scope)).length : afterCount;
+  const appliedCount = mode === 'auto' ? await applyConsolidationOperations(operations) : 0;
+  const finalCount =
+    mode === 'auto'
+      ? (await listMemories(undefined, undefined, scope === 'all' ? undefined : scope)).length
+      : afterCount;
   const summary = summaries.join('\n') || `本地生成 ${operations.length} 项整理操作。`;
-  const modeSummary = mode === 'auto'
-    ? `${summary}\n已自动应用 ${appliedCount} 项整理操作。`
-    : `${summary}\n已生成 ${operations.length} 项待审批整理操作。`;
+  const modeSummary =
+    mode === 'auto'
+      ? `${summary}\n已自动应用 ${appliedCount} 项整理操作。`
+      : `${summary}\n已生成 ${operations.length} 项待审批整理操作。`;
   await recordRun({ scope, status: 'success', summary: modeSummary, beforeCount, afterCount: finalCount, modelName });
-  return { status: 'success', summary: modeSummary, beforeCount, afterCount: finalCount, modelName, mode, operations, appliedCount, details };
+  return {
+    status: 'success',
+    summary: modeSummary,
+    beforeCount,
+    afterCount: finalCount,
+    modelName,
+    mode,
+    operations,
+    appliedCount,
+    details,
+  };
 }

@@ -7,7 +7,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { AccountRuntimeManager } from '@/process/services/teamBff/accountRuntime';
 import { bindAccountRuntime } from '@/process/services/teamBff/modules/memory/account-runtime';
-import { createMemory, deleteMemory, listMemories, updateMemory, type MemoryEntry } from '@/process/services/teamBff/modules/memory/memory-store';
+import {
+  createMemory,
+  deleteMemory,
+  listMemories,
+  updateMemory,
+  type MemoryEntry,
+} from '@/process/services/teamBff/modules/memory/memory-store';
 
 const T1 = '018f0000-0000-7000-8000-000000000001';
 const M1 = '018f0000-0000-7000-8000-000000000002';
@@ -45,9 +51,19 @@ describe('memory-store（移植自 client server/memory-store.ts）', () => {
   });
 
   it('创建/列表/搜索：createMemory 返回条目，listMemories 按 category/scope/关键词过滤', async () => {
-    const created = await createMemory({ title: '偏好：深色主题', content: '用户偏好深色界面', category: 'preference', scope: 'chat' }) as MemoryEntry;
+    const created = (await createMemory({
+      title: '偏好：深色主题',
+      content: '用户偏好深色界面',
+      category: 'preference',
+      scope: 'chat',
+    })) as MemoryEntry;
     expect(created.title).toBe('偏好：深色主题');
-    await createMemory({ title: '事实：常用语言', content: '用户主要使用 TypeScript', category: 'fact', scope: 'code' }) as MemoryEntry;
+    (await createMemory({
+      title: '事实：常用语言',
+      content: '用户主要使用 TypeScript',
+      category: 'fact',
+      scope: 'code',
+    })) as MemoryEntry;
 
     const all = await listMemories();
     expect(all.length).toBeGreaterThanOrEqual(2);
@@ -60,16 +76,31 @@ describe('memory-store（移植自 client server/memory-store.ts）', () => {
   });
 
   it('更新带乐观锁：baseVersion 缺失/过期报冲突，正确版本更新成功', async () => {
-    const created = await createMemory({ title: '要求', content: '回答需简洁', category: 'requirement', scope: 'chat' }) as MemoryEntry;
+    const created = (await createMemory({
+      title: '要求',
+      content: '回答需简洁',
+      category: 'requirement',
+      scope: 'chat',
+    })) as MemoryEntry;
     await expect(updateMemory(created.id, { title: '要求 v2' })).rejects.toThrow('MEMORY_BASE_VERSION_REQUIRED');
-    await expect(updateMemory(created.id, { title: '要求 v2' }, (created as unknown as { version: number }).version + 5))
-      .rejects.toThrow(/VERSION|CONFLICT/);
-    const updated = await updateMemory(created.id, { title: '要求 v2', content: '回答需简洁并给出示例' }, (created as unknown as { version: number }).version) as MemoryEntry;
+    await expect(
+      updateMemory(created.id, { title: '要求 v2' }, (created as unknown as { version: number }).version + 5)
+    ).rejects.toThrow(/VERSION|CONFLICT/);
+    const updated = (await updateMemory(
+      created.id,
+      { title: '要求 v2', content: '回答需简洁并给出示例' },
+      (created as unknown as { version: number }).version
+    )) as MemoryEntry;
     expect(updated.title).toBe('要求 v2');
   });
 
   it('删除同样校验 baseVersion；删除后列表不含该条', async () => {
-    const created = await createMemory({ title: '待删', content: 'x', category: 'fact', scope: 'chat' }) as MemoryEntry;
+    const created = (await createMemory({
+      title: '待删',
+      content: 'x',
+      category: 'fact',
+      scope: 'chat',
+    })) as MemoryEntry;
     await expect(deleteMemory(created.id)).rejects.toThrow();
     await deleteMemory(created.id, (created as unknown as { version: number }).version);
     const all = await listMemories();
@@ -77,7 +108,7 @@ describe('memory-store（移植自 client server/memory-store.ts）', () => {
   });
 
   it('多账号隔离：另一成员的库看不到 A 的记忆', async () => {
-    await createMemory({ title: 'A 的秘密', content: '只属于 A', category: 'fact', scope: 'chat' }) as MemoryEntry;
+    (await createMemory({ title: 'A 的秘密', content: '只属于 A', category: 'fact', scope: 'chat' })) as MemoryEntry;
     await retire(runtime);
     const runtimeB = await activateAccount(root, '018f0000-0000-7000-8000-00000000000b');
     const empty = await listMemories();

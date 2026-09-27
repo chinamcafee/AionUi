@@ -412,6 +412,18 @@
   "imageInputSupported": "目前設定已啟用",
   "imageInputUnsupported": "目前設定已停用",
   "imageInputTip": "自動識別會沿用模型目錄的能力判斷；僅在需要覆寫時手動啟用或停用。",
+  "modelCapability": {
+    "title": "模型能力",
+    "text": "文字",
+    "vision": "視覺",
+    "embedding": "嵌入",
+    "textLabel": "文字模型",
+    "textDesc": "對話與文字生成",
+    "visionLabel": "視覺理解",
+    "visionDesc": "圖片輸入與理解",
+    "embeddingLabel": "嵌入模型",
+    "embeddingDesc": "僅用於嵌入檢索"
+  },
   "openAiApiMode": "OpenAI 請求介面",
   "openAiApiModeAuto": "API · 自動",
   "openAiApiModeChatCompletions": "Chat Completions",

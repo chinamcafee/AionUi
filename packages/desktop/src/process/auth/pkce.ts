@@ -50,9 +50,15 @@ export function parseAuthorizationCallback(rawUrl: string, expectedState: string
   } catch {
     throw new Error('AUTH_CALLBACK_INVALID');
   }
-  if (callback.protocol !== CALLBACK_PROTOCOL || callback.hostname !== CALLBACK_HOST ||
-      callback.pathname !== CALLBACK_PATH || callback.username || callback.password ||
-      callback.port || callback.hash) {
+  if (
+    callback.protocol !== CALLBACK_PROTOCOL ||
+    callback.hostname !== CALLBACK_HOST ||
+    callback.pathname !== CALLBACK_PATH ||
+    callback.username ||
+    callback.password ||
+    callback.port ||
+    callback.hash
+  ) {
     throw new Error('AUTH_CALLBACK_INVALID');
   }
   const allowed = new Set(['code', 'state', 'error', 'error_description']);

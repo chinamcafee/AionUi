@@ -1,14 +1,15 @@
 import type { IProvider } from '@/common/config/storage';
-import {
-  type ModelImageInputChoice,
-  type ModelOpenAiApiModeChoice,
-  supportsOpenAiApiMode,
-  updateModelSettings,
-} from '@/common/utils/modelCapabilities';
+import { type ModelOpenAiApiModeChoice, supportsOpenAiApiMode } from '@/common/utils/modelCapabilities';
 import ModalHOC from '@/renderer/utils/ui/ModalHOC';
+import {
+  ModelCapabilitySwitchGroup,
+  readCapabilityState,
+  buildCapabilityModelSettings,
+  DEFAULT_CAPABILITY_STATE,
+  type CapabilitySwitchState,
+} from './ModelCapabilitySwitches';
 import AionModal from '@/renderer/components/base/AionModal';
 import { Select } from '@arco-design/web-react';
-import { PreviewOpen } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useModeModeList from '@renderer/hooks/agent/useModeModeList';
@@ -23,8 +24,10 @@ const AddModelModal = ModalHOC<{ data?: IProvider; model?: string; onSubmit: (mo
     const { t } = useTranslation();
     const [models, setModels] = useState<string[]>([]);
     const [modelProtocol, setModelProtocol] = useState<string>('openai');
-    const [imageInput, setImageInput] = useState<ModelImageInputChoice>('auto');
     const [openAiApiMode, setOpenAiApiMode] = useState<ModelOpenAiApiModeChoice>('auto');
+    const [capState, setCapState] = useState<CapabilitySwitchState>(DEFAULT_CAPABILITY_STATE);
+    // E-29：用户交互标记——一旦用户拨了能力开关，useEffect 不再重置（防止 re-render 竞态覆盖）
+    const capTouchedRef = React.useRef(false);
     const isNewApi = isNewApiPlatform(data?.platform ?? '');
     const isEditing = Boolean(editingModel);
     const { data: modelList, isLoading } = useModeModeList(data?.platform, data?.base_url, data?.api_key);
@@ -43,22 +46,24 @@ const AddModelModal = ModalHOC<{ data?: IProvider; model?: string; onSubmit: (mo
       if (!modalProps.visible) return;
 
       setModels([]);
-      const settings = editingModel ? data?.model_settings?.[editingModel] : undefined;
-      setImageInput(settings?.image_input ?? 'auto');
-      setOpenAiApiMode(settings?.openai_api_mode ?? 'auto');
+      setOpenAiApiMode(editingModel ? (data?.model_settings?.[editingModel]?.openai_api_mode ?? 'auto') : 'auto');
+      if (!capTouchedRef.current) {
+        setCapState(readCapabilityState(data, editingModel));
+      }
       setModelProtocol(editingModel ? (data?.model_protocols?.[editingModel] ?? 'openai') : 'openai');
-    }, [data, editingModel, modalProps.visible]);
+    }, [modalProps.visible, editingModel]);
 
     const handleConfirm = useCallback(() => {
       if (!data || (!editingModel && !models.length)) return;
       const targetModels = editingModel ? [editingModel] : models;
+      // 能力开关是逐模型设置的唯一入口：统一写入 model_settings（capabilities/is_embedding/image_input）
       const updatedData: IProvider = {
         ...data,
         models: editingModel ? existingModels : [...existingModels, ...models],
-        model_settings: updateModelSettings(
+        model_settings: buildCapabilityModelSettings(
           data.model_settings,
           targetModels,
-          imageInput,
+          capState,
           showOpenAiApiMode ? openAiApiMode : 'auto'
         ),
       };
@@ -77,7 +82,7 @@ const AddModelModal = ModalHOC<{ data?: IProvider; model?: string; onSubmit: (mo
       data,
       editingModel,
       existingModels,
-      imageInput,
+      capState,
       isNewApi,
       modelProtocol,
       models,
@@ -138,21 +143,16 @@ const AddModelModal = ModalHOC<{ data?: IProvider; model?: string; onSubmit: (mo
             </div>
           )}
 
+          {/* 模型能力并列开关（视觉理解开关即图片输入能力，不再单独提供视觉输入下拉） */}
           <div className='space-y-8px'>
-            <div className='flex items-center gap-5px text-13px font-500 text-t-secondary'>
-              <PreviewOpen theme='outline' size='14' />
-              <span>{t('settings.imageInput')}</span>
-            </div>
-            <Select
-              value={imageInput}
-              onChange={(value) => setImageInput(value as ModelImageInputChoice)}
-              options={[
-                { label: t('settings.imageInputAuto'), value: 'auto' },
-                { label: t('settings.imageInputSupported'), value: 'supported' },
-                { label: t('settings.imageInputUnsupported'), value: 'unsupported' },
-              ]}
+            <div className='text-13px font-500 text-t-secondary'>{t('settings.modelCapability.title')}</div>
+            <ModelCapabilitySwitchGroup
+              value={capState}
+              onChange={(next) => {
+                capTouchedRef.current = true;
+                setCapState(next);
+              }}
             />
-            <div className='text-11px text-t-secondary leading-4'>{t('settings.imageInputTip')}</div>
           </div>
 
           {showOpenAiApiMode && (

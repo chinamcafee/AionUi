@@ -17,6 +17,8 @@ const AppearanceSettings = React.lazy(() => import('@renderer/pages/settings/App
 const ModeSettings = React.lazy(() => import('@renderer/pages/settings/ModeSettings'));
 const SystemSettings = React.lazy(() => import('@renderer/pages/settings/SystemSettings'));
 const TeamPlatformSettings = React.lazy(() => import('@renderer/pages/settings/TeamPlatformSettings'));
+const KESettingsTab = React.lazy(() => import('@renderer/pages/settings/KESettingsTab'));
+const MemoryBackupSettings = React.lazy(() => import('@renderer/pages/settings/MemoryBackupSettings'));
 const MemoryPage = React.lazy(() => import('@renderer/pages/memory/MemoryPage'));
 const KnowledgePage = React.lazy(() => import('@renderer/pages/knowledge/KnowledgePage'));
 const WebuiSettings = React.lazy(() => import('@renderer/pages/settings/WebuiSettings'));
@@ -108,6 +110,8 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route path='/settings/archived' element={withRouteFallback(ArchivedSettings)} />
           <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
           <Route path='/settings/team' element={withRouteFallback(TeamPlatformSettings)} />
+          <Route path='/settings/ke-settings' element={withRouteFallback(KESettingsTab)} />
+          <Route path='/settings/memory-backup' element={withRouteFallback(MemoryBackupSettings)} />
           <Route path='/memory' element={withRouteFallback(MemoryPage)} />
           <Route path='/knowledge' element={withRouteFallback(KnowledgePage)} />
           <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />

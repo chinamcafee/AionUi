@@ -13,5 +13,10 @@
     "specifyWorkspace": "Select project folder",
     "searchPlaceholder": "Search projects…",
     "noProject": "No Project"
+  },
+  "knowledge": {
+    "label": "Knowledge",
+    "tooltipOn": "Knowledge base connected: your question is first answered from team knowledge and injected as context",
+    "tooltipOff": "When on, your question first queries the KE-v2 team knowledge base and injects the result as context"
   }
 }

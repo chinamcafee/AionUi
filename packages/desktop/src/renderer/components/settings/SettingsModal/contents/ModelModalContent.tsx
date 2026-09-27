@@ -1,3 +1,4 @@
+import { KEModelConfigSection } from '@renderer/pages/settings/KEModelConfigSection';
 /**
  * @license
  * Copyright 2025 AionUi (aionui.com)
@@ -26,6 +27,7 @@ import AddModelModal from '@/renderer/pages/settings/components/AddModelModal';
 import AddPlatformModal from '@/renderer/pages/settings/components/AddPlatformModal';
 import { isNewApiPlatform, NEW_API_PROTOCOL_OPTIONS } from '@/renderer/utils/model/modelPlatforms';
 import EditModeModal from '@/renderer/pages/settings/components/EditModeModal';
+import { readCapabilityState } from '@/renderer/pages/settings/components/ModelCapabilitySwitches';
 import AionScrollArea from '@/renderer/components/base/AionScrollArea';
 import TalkToButlerButton from '@/renderer/components/base/TalkToButlerButton';
 import { useProvidersQuery } from '@/renderer/hooks/agent/useModelProviderList';
@@ -618,6 +620,35 @@ const ModelModalContent: React.FC = () => {
                             </div>
 
                             <div className='flex items-center gap-6px shrink-0'>
+                              {/* 能力 tag：与「配置模型」弹窗共用 readCapabilityState，逐模型读取保证一致 */}
+                              {(() => {
+                                const capState = readCapabilityState(platform, model);
+                                if (capState.embedding) {
+                                  return (
+                                    <Tag size='small' color='purple' className='shrink-0'>
+                                      {t('settings.modelCapability.embedding')}
+                                    </Tag>
+                                  );
+                                }
+                                const items: React.ReactNode[] = [];
+                                if (capState.text) {
+                                  items.push(
+                                    <Tag key='text' size='small' color='arcoblue' className='shrink-0'>
+                                      {t('settings.modelCapability.text')}
+                                    </Tag>
+                                  );
+                                }
+                                if (capState.vision) {
+                                  items.push(
+                                    <Tag key='vision' size='small' color='green' className='shrink-0'>
+                                      {t('settings.modelCapability.vision')}
+                                    </Tag>
+                                  );
+                                }
+                                return items;
+                              })()}
+
+                              {/* 配置模型按钮 / Configure model button (E-27 加回) */}
                               <Tooltip content={t('settings.configureModel')}>
                                 <Button
                                   size='mini'
@@ -686,6 +717,9 @@ const ModelModalContent: React.FC = () => {
           </div>
         )}
       </AionScrollArea>
+
+      {/* E-26 S3: 知识引擎模型配置区块 */}
+      <KEModelConfigSection />
     </div>
   );
 };

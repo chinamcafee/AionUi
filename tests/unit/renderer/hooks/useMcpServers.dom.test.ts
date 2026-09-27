@@ -21,7 +21,12 @@ vi.mock('@/common', () => ({
 
 vi.mock('@/renderer/hooks/context/TeamAuthContext', () => ({
   // M5/T5.4 合并逻辑依赖 TeamAuthContext；单测默认未登录团队账号（不合并内置知识 server）
-  useTeamAuth: () => ({ view: { phase: 'signed_out' }, featureEnabled: false, bootstrap: null, hasPermission: () => false }),
+  useTeamAuth: () => ({
+    view: { phase: 'signed_out' },
+    featureEnabled: false,
+    bootstrap: null,
+    hasPermission: () => false,
+  }),
 }));
 vi.mock('@/renderer/hooks/mcp/catalog', () => ({
   ensureBackendMcpCatalog: ensureBackendMcpCatalogMock,

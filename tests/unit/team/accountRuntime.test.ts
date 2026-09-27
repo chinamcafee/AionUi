@@ -37,7 +37,11 @@ describe('AccountRuntimeManager（移植自 client server/account-runtime.ts）'
     expect(unchanged.status).toBe('unchanged');
     const switched = await runtime.activate({ tenantId: T1, tenantMemberId: M1, activeTeamId: TEAM_B });
     expect(switched.status).toBe('team_switched');
-    const other = await runtime.activate({ tenantId: T1, tenantMemberId: '018f0000-0000-7000-8000-00000000000a', activeTeamId: null });
+    const other = await runtime.activate({
+      tenantId: T1,
+      tenantMemberId: '018f0000-0000-7000-8000-00000000000a',
+      activeTeamId: null,
+    });
     expect(other.status).toBe('activated');
     await runtime.deactivate();
   });
@@ -57,6 +61,8 @@ describe('AccountRuntimeManager（移植自 client server/account-runtime.ts）'
 
   it('非法 subject（非 UUID）拒绝', async () => {
     const runtime = newRuntime();
-    await expect(runtime.activate({ tenantId: 'not-a-uuid', tenantMemberId: M1, activeTeamId: null })).rejects.toThrow('ACCOUNT_SUBJECT_INVALID');
+    await expect(runtime.activate({ tenantId: 'not-a-uuid', tenantMemberId: M1, activeTeamId: null })).rejects.toThrow(
+      'ACCOUNT_SUBJECT_INVALID'
+    );
   });
 });

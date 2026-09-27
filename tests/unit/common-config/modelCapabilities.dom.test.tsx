@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IProvider } from '@/common/config/storage';
 
@@ -266,6 +266,10 @@ vi.mock('@arco-design/web-react', async (importOriginal) => {
 });
 
 import { supportsOpenAiApiMode, updateModelSettings } from '@/common/utils/modelCapabilities';
+import {
+  buildCapabilityModelSettings,
+  readCapabilityState,
+} from '@/renderer/pages/settings/components/ModelCapabilitySwitches';
 import AddModelModal from '@/renderer/pages/settings/components/AddModelModal';
 import AddPlatformModal from '@/renderer/pages/settings/components/AddPlatformModal';
 import ModelModalContent from '@/renderer/components/settings/SettingsModal/contents/ModelModalContent';
@@ -352,6 +356,78 @@ describe('updateModelSettings', () => {
   });
 });
 
+describe('per-model capability state (read/write single source)', () => {
+  it('reads the default text state for an unconfigured model', () => {
+    expect(readCapabilityState(provider(), 'gpt-4o')).toEqual({ text: true, vision: false, embedding: false });
+  });
+
+  it('reads explicit per-model capabilities', () => {
+    const p = provider({
+      model_settings: { 'gpt-4o': { capabilities: ['text', 'vision'], image_input: 'supported' } },
+    });
+    expect(readCapabilityState(p, 'gpt-4o')).toEqual({ text: true, vision: true, embedding: false });
+  });
+
+  it('reads embedding from the is_embedding marker regardless of other fields', () => {
+    const p = provider({ model_settings: { 'gpt-4o': { is_embedding: true, image_input: 'unsupported' } } });
+    expect(readCapabilityState(p, 'gpt-4o')).toEqual({ text: false, vision: false, embedding: true });
+  });
+
+  it('falls back to image_input for legacy data without a capability list', () => {
+    const p = provider({ model_settings: { 'gpt-4o': { image_input: 'supported' } } });
+    expect(readCapabilityState(p, 'gpt-4o')).toEqual({ text: true, vision: true, embedding: false });
+  });
+
+  it('ignores provider-level capabilities so group state never leaks into a model', () => {
+    const p = provider({ capabilities: [{ type: 'embedding', isUserSelected: true }] });
+    expect(readCapabilityState(p, 'gpt-4o')).toEqual({ text: true, vision: false, embedding: false });
+  });
+
+  it('writes embedding state with is_embedding and forced image_input', () => {
+    const result = buildCapabilityModelSettings(undefined, ['bge-m3'], {
+      text: false,
+      vision: false,
+      embedding: true,
+    });
+    expect(result).toEqual({
+      'bge-m3': { capabilities: ['embedding'], is_embedding: true, image_input: 'unsupported' },
+    });
+  });
+
+  it('writes vision as capabilities plus image_input override', () => {
+    const result = buildCapabilityModelSettings(
+      undefined,
+      ['gpt-4o'],
+      { text: true, vision: true, embedding: false },
+      'responses'
+    );
+    expect(result).toEqual({
+      'gpt-4o': { capabilities: ['text', 'vision'], image_input: 'supported', openai_api_mode: 'responses' },
+    });
+  });
+
+  it('clears stale embedding/image_input/openai_api_mode overrides when switched back', () => {
+    const result = buildCapabilityModelSettings(
+      { 'gpt-4o': { is_embedding: true, image_input: 'unsupported', openai_api_mode: 'responses' } },
+      ['gpt-4o'],
+      { text: true, vision: false, embedding: false },
+      'auto'
+    );
+    expect(result).toEqual({ 'gpt-4o': { capabilities: ['text'] } });
+  });
+
+  it('leaves settings of other models untouched', () => {
+    const result = buildCapabilityModelSettings(
+      { other: { is_embedding: true, capabilities: ['embedding'] } },
+      ['gpt-4o'],
+      { text: true, vision: false, embedding: false },
+      'auto'
+    );
+    expect(result.other).toEqual({ is_embedding: true, capabilities: ['embedding'] });
+    expect(result['gpt-4o']).toEqual({ capabilities: ['text'] });
+  });
+});
+
 describe('model capability selectors', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -378,7 +454,7 @@ describe('model capability selectors', () => {
     cleanup();
   });
 
-  it('uses dropdowns and preserves explicit values while editing a model', async () => {
+  it('keeps explicit capability switches and API mode while editing a model', async () => {
     render(
       <AddModelModal
         data={provider({
@@ -393,19 +469,25 @@ describe('model capability selectors', () => {
       />
     );
 
+    // Legacy image_input=supported data initializes the vision switch to on
     await waitFor(() => {
-      expect(screen.getByTestId('vision-select')).toHaveValue('supported');
       expect(screen.getByTestId('api-mode-select')).toHaveValue('responses');
     });
+    const switches = screen.getAllByRole('switch');
+    expect(switches).toHaveLength(3);
+    expect(switches[0]).toHaveAttribute('aria-checked', 'true'); // text
+    expect(switches[1]).toHaveAttribute('aria-checked', 'true'); // vision
+    expect(switches[2]).toHaveAttribute('aria-checked', 'false'); // embedding
 
-    fireEvent.change(screen.getByTestId('vision-select'), { target: { value: 'unsupported' } });
+    // Turn vision off and switch the API mode back to chat_completions
+    fireEvent.click(switches[1]);
     fireEvent.change(screen.getByTestId('api-mode-select'), { target: { value: 'chat_completions' } });
     fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }));
 
     expect(mocks.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         model_settings: {
-          'gpt-4o': { image_input: 'unsupported', openai_api_mode: 'chat_completions' },
+          'gpt-4o': { capabilities: ['text'], openai_api_mode: 'chat_completions' },
         },
       })
     );
@@ -423,12 +505,14 @@ describe('model capability selectors', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('vision-select')).toHaveValue('auto');
+      expect(screen.getAllByRole('switch')).toHaveLength(3);
     });
     expect(screen.queryByTestId('api-mode-select')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }));
-    expect(mocks.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ model_settings: {} }));
+    expect(mocks.onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ model_settings: { 'gpt-4o': { capabilities: ['text'] } } })
+    );
   });
 
   it('does not submit when provider data is unavailable', () => {
@@ -484,7 +568,8 @@ describe('model capability selectors', () => {
     expect(screen.queryByTestId('api-mode-select')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('protocol-select'), { target: { value: 'openai' } });
-    fireEvent.change(screen.getByTestId('vision-select'), { target: { value: 'supported' } });
+    // Turn on the vision capability switch (switches: text / vision / embedding)
+    fireEvent.click(screen.getAllByRole('switch')[1]);
     fireEvent.change(screen.getByTestId('api-mode-select'), { target: { value: 'responses' } });
     fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }));
 
@@ -495,15 +580,19 @@ describe('model capability selectors', () => {
           'gpt-5.6-sol': 'openai',
         },
         model_settings: {
-          'claude-sonnet-4': { image_input: 'supported', openai_api_mode: 'responses' },
-          'gpt-5.6-sol': { image_input: 'supported', openai_api_mode: 'responses' },
+          'claude-sonnet-4': {
+            capabilities: ['text', 'vision'],
+            image_input: 'supported',
+            openai_api_mode: 'responses',
+          },
+          'gpt-5.6-sol': { capabilities: ['text', 'vision'], image_input: 'supported', openai_api_mode: 'responses' },
         },
         models: ['gpt-4o', 'gpt-5.6-sol', 'claude-sonnet-4'],
       })
     );
   });
 
-  it('shows dropdowns for the new OpenAI-compatible provider form', async () => {
+  it('shows capability switches for the new OpenAI-compatible provider form', async () => {
     render(
       <AddPlatformModal
         deepLinkData={{ api_key: 'test-key', base_url: 'https://api.example.com/v1', platform: 'OpenAI' }}
@@ -514,11 +603,11 @@ describe('model capability selectors', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('vision-select')).toHaveValue('auto');
       expect(screen.getByTestId('api-mode-select')).toHaveValue('auto');
     });
 
-    fireEvent.change(screen.getByTestId('vision-select'), { target: { value: 'supported' } });
+    // Turn on the vision capability switch (switches: text / vision / embedding)
+    fireEvent.click(screen.getAllByRole('switch')[1]);
     fireEvent.change(screen.getByTestId('api-mode-select'), { target: { value: 'responses' } });
     const modelSelect = screen.getByTestId('model-select') as HTMLSelectElement;
     Array.from(modelSelect.options).forEach((option) => {
@@ -531,7 +620,7 @@ describe('model capability selectors', () => {
       expect(mocks.onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
           model_settings: {
-            'gpt-5.6-sol': { image_input: 'supported', openai_api_mode: 'responses' },
+            'gpt-5.6-sol': { capabilities: ['text', 'vision'], image_input: 'supported', openai_api_mode: 'responses' },
           },
           models: ['gpt-5.6-sol'],
         })
@@ -551,7 +640,7 @@ describe('model capability selectors', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('vision-select')).toHaveValue('auto');
+      expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
     });
     expect(screen.queryByTestId('api-mode-select')).not.toBeInTheDocument();
 
@@ -563,7 +652,9 @@ describe('model capability selectors', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }));
 
     await waitFor(() => {
-      expect(mocks.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ model_settings: {} }));
+      expect(mocks.onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ model_settings: { 'gpt-5.6-sol': { capabilities: ['text'] } } })
+      );
     });
   });
 });
@@ -619,9 +710,45 @@ describe('configured model list', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByTestId('vision-select')).toHaveValue('unsupported');
-      expect(screen.getByTestId('api-mode-select')).toHaveValue('chat_completions');
     });
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.getByTestId('api-mode-select')).toHaveValue('chat_completions');
+    // gpt-chat has no explicit capabilities and image_input=unsupported →
+    // default text-only state (switches: text / vision / embedding)
+    const switches = dialog.getAllByRole('switch');
+    expect(switches[0]).toHaveAttribute('aria-checked', 'true');
+    expect(switches[1]).toHaveAttribute('aria-checked', 'false');
+    expect(switches[2]).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('renders per-model capability tags matching the configure-model form state', async () => {
+    mocks.providers.splice(
+      0,
+      mocks.providers.length,
+      provider({
+        models: ['chat-model', 'vision-model', 'embed-model'],
+        model_settings: {
+          'vision-model': { capabilities: ['text', 'vision'], image_input: 'supported' },
+          'embed-model': { capabilities: ['embedding'], is_embedding: true, image_input: 'unsupported' },
+        },
+      })
+    );
+    render(<ModelModalContent />);
+
+    // 列表 tag 与配置弹窗都读取同一 per-model 状态
+    expect(screen.getAllByText('settings.modelCapability.text')).toHaveLength(2);
+    expect(screen.getByText('settings.modelCapability.vision')).toBeInTheDocument();
+    expect(screen.getByText('settings.modelCapability.embedding')).toBeInTheDocument();
+
+    // Open the embedding model's configure dialog: embedding switch on, others off
+    fireEvent.click(screen.getAllByRole('button', { name: 'configure' })[2]);
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    const switches = within(screen.getByRole('dialog')).getAllByRole('switch');
+    expect(switches[0]).toHaveAttribute('aria-checked', 'false');
+    expect(switches[1]).toHaveAttribute('aria-checked', 'false');
+    expect(switches[2]).toHaveAttribute('aria-checked', 'true');
   });
 
   it('removes all per-model state when deleting a model', async () => {

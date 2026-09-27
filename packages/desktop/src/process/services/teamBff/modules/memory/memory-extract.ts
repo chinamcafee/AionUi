@@ -15,7 +15,10 @@ import { generateText } from 'ai';
 import { createMemory, type MemoryCategory } from './memory-store.js';
 import { getMemoryModel } from './memory-model-util.js';
 
-const EXTRACT_PROMPT = (userInput: string, assistantText: string) => `你是一个记忆抽取助手。判断下面这轮对话中，用户是否陈述了值得长期记住的个人偏好、事实、要求或重要事件。
+const EXTRACT_PROMPT = (
+  userInput: string,
+  assistantText: string
+) => `你是一个记忆抽取助手。判断下面这轮对话中，用户是否陈述了值得长期记住的个人偏好、事实、要求或重要事件。
 只抽取**用户主动陈述的、关于用户自身的、稳定可复用的**信息。忽略：闲聊、一次性提问、与用户自身无关的内容。
 
 用户输入：${userInput}
@@ -43,7 +46,8 @@ export async function autoExtractMemory(userInput: string, assistantText: string
   }
 
   // 取「模型绑定」页绑定的 memory 模型；未绑定 → 跳过。
-  let model; let name;
+  let model;
+  let name;
   try {
     ({ model, name } = await getMemoryModel());
   } catch {
@@ -54,8 +58,16 @@ export async function autoExtractMemory(userInput: string, assistantText: string
     const res = await generateText({ model, prompt: EXTRACT_PROMPT(userInput, assistantText) });
     const text = res.text.trim();
     // 容错：剥离可能的 ```json 包裹
-    const jsonStr = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsed = JSON.parse(jsonStr) as { skip?: boolean; title?: string; content?: string; category?: MemoryCategory };
+    const jsonStr = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const parsed = JSON.parse(jsonStr) as {
+      skip?: boolean;
+      title?: string;
+      content?: string;
+      category?: MemoryCategory;
+    };
     if (parsed.skip || !parsed.title || !parsed.content) {
       return { status: 'skipped', reason: '模型判定不值得记忆' };
     }

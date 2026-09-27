@@ -14,7 +14,7 @@ export interface VerifiedAccountContext extends AccountResourceSubject {
 
 export function deriveVerifiedAccountContext(
   subject: Readonly<AccountSubject> | null,
-  claimedResourceId?: unknown,
+  claimedResourceId?: unknown
 ): Readonly<VerifiedAccountContext> {
   if (!subject) throw new Error('ACCOUNT_RUNTIME_REQUIRED');
   if (!subject.activeTeamId) throw new Error('ACTIVE_TEAM_REQUIRED');
@@ -24,8 +24,12 @@ export function deriveVerifiedAccountContext(
     activeTeamId: subject.activeTeamId,
   };
   const resourceId = buildAccountResourceId(accountSubject);
-  if (claimedResourceId !== undefined && claimedResourceId !== null && claimedResourceId !== '' &&
-      claimedResourceId !== resourceId) {
+  if (
+    claimedResourceId !== undefined &&
+    claimedResourceId !== null &&
+    claimedResourceId !== '' &&
+    claimedResourceId !== resourceId
+  ) {
     throw new Error('RESOURCE_CONTEXT_MISMATCH');
   }
   return Object.freeze({ ...accountSubject, resourceId });
@@ -42,4 +46,11 @@ export function verifiedAccountContextEntries(context: VerifiedAccountContext): 
     [VERIFIED_ACCOUNT_KEYS.activeTeamId, context.activeTeamId],
     [VERIFIED_ACCOUNT_KEYS.resourceId, context.resourceId],
   ];
+}
+
+/** Backup ownership is tenant membership scoped and does not require a Team. */
+export function currentPersonalBackupContext() {
+  const subject = accountRuntime.currentSubject();
+  if (!subject) throw new Error('ACCOUNT_RUNTIME_REQUIRED');
+  return Object.freeze({ tenantId: subject.tenantId, tenantMemberId: subject.tenantMemberId });
 }

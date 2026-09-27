@@ -4,7 +4,9 @@ import { type IExtensionSettingsTab } from '@/common/adapter/ipcBridge';
 import { useExtI18n } from '@/renderer/hooks/system/useExtI18n';
 import { useExtensionSettingsTabs } from '@/renderer/hooks/system/useExtensionSettingsTabs';
 import {
+  Bookshelf,
   Cat,
+  CloudStorage,
   Communication,
   Computer,
   Earth,
@@ -33,6 +35,8 @@ export const BUILTIN_TAB_IDS = [
   'appearance',
   'webui',
   'team',
+  'ke-settings',
+  'memory-backup',
   'pet',
   'system',
   'archived',
@@ -112,11 +116,23 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
         icon: isDesktop ? <Earth /> : <Communication />,
         path: 'webui',
       },
+      'ke-settings': {
+        id: 'ke-settings',
+        label: t('settings.keSettings', { defaultValue: '知识库设置' }),
+        icon: <Bookshelf />,
+        path: 'ke-settings',
+      },
       team: {
         id: 'team',
         label: t('settings.teamPlatform', { defaultValue: '团队平台' }),
         icon: <Earth />,
         path: 'team',
+      },
+      'memory-backup': {
+        id: 'memory-backup',
+        label: t('settings.memoryBackup', { defaultValue: '个人记忆备份' }),
+        icon: <CloudStorage />,
+        path: 'memory-backup',
       },
       pet: { id: 'pet', label: t('pet.desktopPet'), icon: <Cat />, path: 'pet' },
       system: { id: 'system', label: t('settings.system'), icon: <System />, path: 'system' },

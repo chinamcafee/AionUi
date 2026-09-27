@@ -1,5 +1,11 @@
 import { accountRuntime } from './account-runtime.js';
-import { getMemoryStoreContext, listMemories, listMemoryAccessLogs, type MemoryEntry, type MemoryScope } from './memory-store.js';
+import {
+  getMemoryStoreContext,
+  listMemories,
+  listMemoryAccessLogs,
+  type MemoryEntry,
+  type MemoryScope,
+} from './memory-store.js';
 import { graphRecall, type GraphRecallHit } from './memory-graph.js';
 import { retentionOf, retentionScoreFactor, RETENTION } from './memory-retention.js';
 import {
@@ -18,7 +24,12 @@ const RRF_K = 60;
 const DEFAULT_FUSION_DEPTH = 20;
 const initialization = new Map<number, Promise<void>>();
 let rebuildScheduled = false;
-accountRuntime.registerCacheInvalidator(() => { initialization.clear(); rebuildScheduled = false; graphRecallAnnotations.length = 0; graphRecallSeq = 0; });
+accountRuntime.registerCacheInvalidator(() => {
+  initialization.clear();
+  rebuildScheduled = false;
+  graphRecallAnnotations.length = 0;
+  graphRecallSeq = 0;
+});
 
 /** Float32Array → BLOB 序列化：显式 byteOffset/byteLength（agentmemory #455 教训，禁止直接用整个 buffer） */
 export function serializeFloat32Vector(vector: Float32Array): Buffer {
@@ -62,7 +73,12 @@ function recordGraphRecallAnnotations(hits: HybridMemoryHit[]): void {
   for (const hit of hits) {
     if (!hit.viaGraph) continue;
     graphRecallSeq += 1;
-    graphRecallAnnotations.push({ seq: graphRecallSeq, memoryId: hit.memory.id, title: hit.memory.title, viaGraph: hit.viaGraph });
+    graphRecallAnnotations.push({
+      seq: graphRecallSeq,
+      memoryId: hit.memory.id,
+      title: hit.memory.title,
+      viaGraph: hit.viaGraph,
+    });
   }
   if (graphRecallAnnotations.length > GRAPH_RECALL_ANNOTATION_CAP) {
     graphRecallAnnotations.splice(0, graphRecallAnnotations.length - GRAPH_RECALL_ANNOTATION_CAP);
@@ -93,7 +109,8 @@ export function tokenizeForMemorySearch(text: string): string[] {
     }
     if (chars.length === 1) tokens.push(chars[0]);
     for (let index = 0; index < chars.length - 1; index += 1) tokens.push(chars[index] + chars[index + 1]);
-    for (let index = 0; index < chars.length - 2; index += 1) tokens.push(chars[index] + chars[index + 1] + chars[index + 2]);
+    for (let index = 0; index < chars.length - 2; index += 1)
+      tokens.push(chars[index] + chars[index + 1] + chars[index + 2]);
   }
   return [...new Set(tokens)].slice(0, 256);
 }
@@ -115,7 +132,10 @@ export function expandQueryForFts(query: string): string[] {
       if (segment.length > 1) tokens.push(segment);
       continue;
     }
-    if (chars.length === 1) { tokens.push(chars[0]); continue; }
+    if (chars.length === 1) {
+      tokens.push(chars[0]);
+      continue;
+    }
     for (let index = 0; index < chars.length - 1; index += 1) tokens.push(chars[index] + chars[index + 1]);
   }
   return [...new Set(tokens)].slice(0, 64);
@@ -142,7 +162,7 @@ export function cosineSimilarity(left: ArrayLike<number>, right: ArrayLike<numbe
  * 避免向量流缺失（provider 不可用）时总分被稀释影响阈值判断。
  */
 export function fuseMemoryRanks(
-  channels: Array<{ channel: MemoryRetrievalChannel; ids: string[]; weight?: number }>,
+  channels: Array<{ channel: MemoryRetrievalChannel; ids: string[]; weight?: number }>
 ): Map<string, { score: number; channels: MemoryRetrievalChannel[] }> {
   const effective = channels.filter((channel) => (channel.weight ?? 1) > 0 && channel.ids.length > 0);
   const totalWeight = effective.reduce((sum, channel) => sum + (channel.weight ?? 1), 0);
@@ -199,11 +219,14 @@ type SearchDatabase = Awaited<ReturnType<typeof ensureSearchSchema>>;
 
 /** 清空投影三表（memory_fts / memory_vectors / memory_search_state），供模型指纹 bump 与手动 reindex 使用 */
 async function clearProjectionTables(database: SearchDatabase): Promise<void> {
-  await database.batch([
-    { sql: 'DELETE FROM memory_fts', args: [] },
-    { sql: 'DELETE FROM memory_vectors', args: [] },
-    { sql: 'DELETE FROM memory_search_state', args: [] },
-  ], 'write');
+  await database.batch(
+    [
+      { sql: 'DELETE FROM memory_fts', args: [] },
+      { sql: 'DELETE FROM memory_vectors', args: [] },
+      { sql: 'DELETE FROM memory_search_state', args: [] },
+    ],
+    'write'
+  );
 }
 
 /** fire-and-forget 全量重建：不阻塞启动/检索，重建期间向量流无结果即自然降级 */
@@ -225,10 +248,7 @@ export async function rebuildMemorySearchProjection(): Promise<void> {
 
 async function syncSearchProjection(scope: MemoryScope | MemoryScope[]) {
   const database = await ensureSearchSchema();
-  const [allActive, visible] = await Promise.all([
-    listMemories(),
-    listMemories(undefined, undefined, scope),
-  ]);
+  const [allActive, visible] = await Promise.all([listMemories(), listMemories(undefined, undefined, scope)]);
 
   // T1.6 模型指纹守卫：库内向量与当前模型不符（如旧 96 维哈希）→ 清表 + 后台全量重建；
   // 本次调用直接降级返回（pinned 可用、FTS/vector 为空），不阻塞检索
@@ -268,26 +288,43 @@ async function syncSearchProjection(scope: MemoryScope | MemoryScope[]) {
   for (const memory of staleEntries) {
     const tokens = tokenizeForMemorySearch(`${memory.title} ${memory.content}`).join(' ');
     const vector = vectorsById.get(memory.id) ?? null;
-    await database.batch([
-      { sql: 'DELETE FROM memory_fts WHERE memory_id = ?', args: [memory.id] },
-      { sql: 'INSERT INTO memory_fts (memory_id, tokens) VALUES (?, ?)', args: [memory.id, tokens] },
-      { sql: `INSERT INTO memory_vectors (memory_id, version, model_fingerprint, provider, dimensions, vector)
+    await database.batch(
+      [
+        { sql: 'DELETE FROM memory_fts WHERE memory_id = ?', args: [memory.id] },
+        { sql: 'INSERT INTO memory_fts (memory_id, tokens) VALUES (?, ?)', args: [memory.id, tokens] },
+        {
+          sql: `INSERT INTO memory_vectors (memory_id, version, model_fingerprint, provider, dimensions, vector)
           VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(memory_id) DO UPDATE SET
           version=excluded.version, model_fingerprint=excluded.model_fingerprint,
           provider=excluded.provider, dimensions=excluded.dimensions, vector=excluded.vector`,
-        args: [memory.id, memory.version, VECTOR_MODEL, provider?.name ?? '', provider?.dimensions ?? VECTOR_DIMENSIONS,
-          vector ? serializeFloat32Vector(vector) : null] },
-      { sql: `INSERT INTO memory_search_state (memory_id, version) VALUES (?, ?)
-          ON CONFLICT(memory_id) DO UPDATE SET version=excluded.version`, args: [memory.id, memory.version] },
-    ], 'write');
+          args: [
+            memory.id,
+            memory.version,
+            VECTOR_MODEL,
+            provider?.name ?? '',
+            provider?.dimensions ?? VECTOR_DIMENSIONS,
+            vector ? serializeFloat32Vector(vector) : null,
+          ],
+        },
+        {
+          sql: `INSERT INTO memory_search_state (memory_id, version) VALUES (?, ?)
+          ON CONFLICT(memory_id) DO UPDATE SET version=excluded.version`,
+          args: [memory.id, memory.version],
+        },
+      ],
+      'write'
+    );
   }
   for (const id of versions.keys()) {
     if (activeIds.has(id)) continue;
-    await database.batch([
-      { sql: 'DELETE FROM memory_fts WHERE memory_id = ?', args: [id] },
-      { sql: 'DELETE FROM memory_vectors WHERE memory_id = ?', args: [id] },
-      { sql: 'DELETE FROM memory_search_state WHERE memory_id = ?', args: [id] },
-    ], 'write');
+    await database.batch(
+      [
+        { sql: 'DELETE FROM memory_fts WHERE memory_id = ?', args: [id] },
+        { sql: 'DELETE FROM memory_vectors WHERE memory_id = ?', args: [id] },
+        { sql: 'DELETE FROM memory_search_state WHERE memory_id = ?', args: [id] },
+      ],
+      'write'
+    );
   }
   return { database, visible };
 }
@@ -295,7 +332,7 @@ async function syncSearchProjection(scope: MemoryScope | MemoryScope[]) {
 export async function retrieveHybridMemories(
   query: string,
   scope: MemoryScope | MemoryScope[] = 'chat',
-  limit = DEFAULT_FUSION_DEPTH,
+  limit = DEFAULT_FUSION_DEPTH
 ): Promise<HybridMemoryHit[]> {
   const { database, visible } = await syncSearchProjection(scope);
   if (visible.length === 0) return [];
@@ -303,27 +340,31 @@ export async function retrieveHybridMemories(
   // access_log 批量 IN 查询一次取回，避免 N+1
   const now = Date.now();
   const accessLogs = await listMemoryAccessLogs(visible.map((memory) => memory.id));
-  const retentionById = new Map(visible.map((memory) => [
-    memory.id,
-    retentionOf(memory, accessLogs.get(memory.id) ?? [], now),
-  ]));
-  const candidates = visible.filter((memory) =>
-    memory.pinned || (retentionById.get(memory.id) ?? 1) >= RETENTION.coldThreshold);
+  const retentionById = new Map(
+    visible.map((memory) => [memory.id, retentionOf(memory, accessLogs.get(memory.id) ?? [], now)])
+  );
+  const candidates = visible.filter(
+    (memory) => memory.pinned || (retentionById.get(memory.id) ?? 1) >= RETENTION.coldThreshold
+  );
   if (candidates.length === 0) return [];
   // 召回深度（02 章 §2.2）：各路取 max(limit,20)*2 入融合，融合后保留 top-N 供 rerank
   const fusionDepth = Math.max(limit, DEFAULT_FUSION_DEPTH);
   const streamDepth = fusionDepth * 2;
   const byId = new Map(candidates.map((memory) => [memory.id, memory]));
-  const pinnedIds = candidates.filter((memory) => memory.pinned)
-    .sort((left, right) => right.updatedAt - left.updatedAt).map((memory) => memory.id);
+  const pinnedIds = candidates
+    .filter((memory) => memory.pinned)
+    .toSorted((left, right) => right.updatedAt - left.updatedAt)
+    .map((memory) => memory.id);
   // T1.12 query 侧 bigram 展开（中文连续段 ≥2 字），MATCH 表达式引号转义安全
   const match = buildFtsMatchQuery(query);
   let ftsIds: string[] = [];
   if (match) {
-    const result = await database.execute({
-      sql: 'SELECT memory_id, bm25(memory_fts) AS rank FROM memory_fts WHERE memory_fts MATCH ? ORDER BY rank LIMIT ?',
-      args: [match, streamDepth],
-    }).catch(() => ({ rows: [] }));
+    const result = await database
+      .execute({
+        sql: 'SELECT memory_id, bm25(memory_fts) AS rank FROM memory_fts WHERE memory_fts MATCH ? ORDER BY rank LIMIT ?',
+        args: [match, streamDepth],
+      })
+      .catch(() => ({ rows: [] }));
     ftsIds = result.rows.map((row) => String(row.memory_id)).filter((id) => byId.has(id));
   }
 
@@ -334,16 +375,20 @@ export async function retrieveHybridMemories(
     try {
       const queryVector = await provider.embed(query);
       // 跳过 NULL 行（provider 不可用期间补写的投影）
-      const vectorRows = await database.execute('SELECT memory_id, vector FROM memory_vectors WHERE vector IS NOT NULL');
+      const vectorRows = await database.execute(
+        'SELECT memory_id, vector FROM memory_vectors WHERE vector IS NOT NULL'
+      );
       vectorIds = vectorRows.rows
         .map((row) => {
           try {
             const vector = deserializeFloat32Vector(row.vector as ArrayBuffer | Uint8Array);
             return { id: String(row.memory_id), similarity: cosineSimilarity(queryVector, vector) };
-          } catch { return { id: String(row.memory_id), similarity: 0 }; }
+          } catch {
+            return { id: String(row.memory_id), similarity: 0 };
+          }
         })
         .filter((item) => byId.has(item.id) && item.similarity >= 0.12)
-        .sort((left, right) => right.similarity - left.similarity)
+        .toSorted((left, right) => right.similarity - left.similarity)
         .slice(0, streamDepth)
         .map((item) => item.id);
     } catch {
@@ -368,7 +413,10 @@ export async function retrieveHybridMemories(
       id,
       { score: rank.score * retentionScoreFactor(retentionById.get(id) ?? 1), channels: rank.channels },
     ])
-    .sort((left, right) => right[1].score - left[1].score || (byId.get(right[0])?.updatedAt ?? 0) - (byId.get(left[0])?.updatedAt ?? 0));
+    .toSorted(
+      (left, right) =>
+        right[1].score - left[1].score || (byId.get(right[0])?.updatedAt ?? 0) - (byId.get(left[0])?.updatedAt ?? 0)
+    );
   // T1.13 同标题去重（02 章 §2.3）：同 title 近亲条目（consolidation 未清理干净）只保留最高分一条
   const seenTitles = new Set<string>();
   const deduped = sorted.filter(([id]) => {
@@ -377,18 +425,13 @@ export async function retrieveHybridMemories(
     seenTitles.add(title);
     return true;
   });
-  const results = deduped
-    .slice(0, Math.max(1, Math.min(32, limit)))
-    .map(([id, rank]): HybridMemoryHit => {
-      const graphHit = graphHits.get(id);
-      return {
-        memory: byId.get(id)!,
-        score: rank.score,
-        channels: rank.channels,
-        // T3.8 via 标注："经实体 X 关联"（路径为种子到挂载节点的实体名序列）
-        ...(graphHit ? { viaGraph: `经实体 ${graphHit.viaPath.join(' → ')} 关联` } : {}),
-      };
-    });
+  const results = deduped.slice(0, Math.max(1, Math.min(32, limit))).map(([id, rank]): HybridMemoryHit => {
+    const graphHit = graphHits.get(id);
+    return Object.assign(
+      { memory: byId.get(id)!, score: rank.score, channels: rank.channels },
+      graphHit ? { viaGraph: `经实体 ${graphHit.viaPath.join(` → `)} 关联` } : {}
+    );
+  });
   recordGraphRecallAnnotations(results);
   return results;
 }
@@ -410,8 +453,14 @@ export async function persistEmbeddedMemoryVectors(results: MemoryEmbeddingVecto
           VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(memory_id) DO UPDATE SET
           version=excluded.version, model_fingerprint=excluded.model_fingerprint,
           provider=excluded.provider, dimensions=excluded.dimensions, vector=excluded.vector`,
-        args: [result.memoryId, version, VECTOR_MODEL, result.provider, result.dimensions,
-          serializeFloat32Vector(result.vector)],
+        args: [
+          result.memoryId,
+          version,
+          VECTOR_MODEL,
+          result.provider,
+          result.dimensions,
+          serializeFloat32Vector(result.vector),
+        ],
       });
     }
   } catch {

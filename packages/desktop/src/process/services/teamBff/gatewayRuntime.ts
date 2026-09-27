@@ -4,7 +4,13 @@
 import type { AccountRuntimeManager } from './accountRuntime';
 
 export interface GatewayInvalidationHooks {
-  start?(input: { baseUrl: URL; accessToken: string; tenantId: string; teamId: string; accountSignal: AbortSignal }): void;
+  start?(input: {
+    baseUrl: URL;
+    accessToken: string;
+    tenantId: string;
+    teamId: string;
+    accountSignal: AbortSignal;
+  }): void;
   stop?(): void;
 }
 
@@ -37,7 +43,7 @@ export class TeamGatewayRuntime {
 
   constructor(
     private readonly accountRuntime: AccountRuntimeManager,
-    private readonly invalidation: GatewayInvalidationHooks = {},
+    private readonly invalidation: GatewayInvalidationHooks = {}
   ) {
     accountRuntime.registerCacheInvalidator(() => this.clear());
   }
@@ -62,11 +68,20 @@ export class TeamGatewayRuntime {
     }
     const loopback = ['127.0.0.1', 'localhost', '::1'].includes(baseUrl.hostname);
     // 与上游一致的 token 字符白名单（控制字符显式排除）
-    const validToken = input.accessToken.length >= 32 && input.accessToken.length <= 4096 &&
+    const validToken =
+      input.accessToken.length >= 32 &&
+      input.accessToken.length <= 4096 &&
       // eslint-disable-next-line no-control-regex
       !/[\s\u0000-\u001f\u007f]/.test(input.accessToken);
-    if (baseUrl.username || baseUrl.password || baseUrl.hash || baseUrl.search || baseUrl.pathname !== '/' ||
-        (baseUrl.protocol !== 'https:' && !(loopback && baseUrl.protocol === 'http:')) || !validToken) {
+    if (
+      baseUrl.username ||
+      baseUrl.password ||
+      baseUrl.hash ||
+      baseUrl.search ||
+      baseUrl.pathname !== '/' ||
+      (baseUrl.protocol !== 'https:' && !(loopback && baseUrl.protocol === 'http:')) ||
+      !validToken
+    ) {
       throw new Error('TEAM_GATEWAY_CONFIG_INVALID');
     }
     const subject = this.accountRuntime.currentSubject();
@@ -97,8 +112,13 @@ export class TeamGatewayRuntime {
   private requireCredential(): GatewayCredential {
     const value = this.credential;
     const subject = this.accountRuntime.currentSubject();
-    if (!value || !subject || value.generation !== this.accountRuntime.currentGeneration() ||
-        subject.tenantId !== value.tenantId || subject.activeTeamId !== value.teamId) {
+    if (
+      !value ||
+      !subject ||
+      value.generation !== this.accountRuntime.currentGeneration() ||
+      subject.tenantId !== value.tenantId ||
+      subject.activeTeamId !== value.teamId
+    ) {
       throw new Error('TEAM_GATEWAY_UNAVAILABLE');
     }
     return value;
@@ -115,9 +135,7 @@ export class TeamGatewayRuntime {
       headers,
       redirect: 'error',
       cache: 'no-store',
-      signal: init.signal
-        ? AbortSignal.any([this.accountRuntime.signal(), init.signal])
-        : this.accountRuntime.signal(),
+      signal: init.signal ? AbortSignal.any([this.accountRuntime.signal(), init.signal]) : this.accountRuntime.signal(),
     });
   }
 
@@ -135,14 +153,22 @@ export class TeamGatewayRuntime {
       envelope = JSON.parse(text);
     } catch {
       // eslint-disable-next-line no-console -- 诊断：raw 响应前 300 字符（E-23）
-      console.warn('[teamGateway] non-JSON response:', pathname, 'status:', response.status, 'body:', text.slice(0, 300));
+      console.warn(
+        '[teamGateway] non-JSON response:',
+        pathname,
+        'status:',
+        response.status,
+        'body:',
+        text.slice(0, 300)
+      );
       throw new Error('TEAM_GATEWAY_RESPONSE_INVALID');
     }
     if (!response.ok) {
       // eslint-disable-next-line no-console -- 诊断（E-23）
       console.warn('[teamGateway] upstream error:', pathname, 'status:', response.status, 'body:', text.slice(0, 300));
-      throw new Error(envelope.error?.code ?? (response.status === 401
-        ? 'SESSION_INVALID' : 'TEAM_GATEWAY_UPSTREAM_FAILED'));
+      throw new Error(
+        envelope.error?.code ?? (response.status === 401 ? 'SESSION_INVALID' : 'TEAM_GATEWAY_UPSTREAM_FAILED')
+      );
     }
     return envelope.data;
   }

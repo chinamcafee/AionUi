@@ -400,6 +400,18 @@
   "imageInputSupported": "Activado por la configuración",
   "imageInputUnsupported": "Desactivado por la configuración",
   "imageInputTip": "La opción automática usa la detección de capacidades del catálogo. Actívala o desactívala manualmente solo para anularla.",
+  "modelCapability": {
+    "title": "Capacidades del Modelo",
+    "text": "Texto",
+    "vision": "Visión",
+    "embedding": "Embedding",
+    "textLabel": "Modelo de Texto",
+    "textDesc": "Conversación y generación de texto",
+    "visionLabel": "Comprensión Visual",
+    "visionDesc": "Entrada y comprensión de imágenes",
+    "embeddingLabel": "Modelo de Embedding",
+    "embeddingDesc": "Solo para recuperación vectorial"
+  },
   "openAiApiMode": "API de solicitud de OpenAI",
   "openAiApiModeAuto": "API · Automático",
   "openAiApiModeChatCompletions": "Chat Completions",

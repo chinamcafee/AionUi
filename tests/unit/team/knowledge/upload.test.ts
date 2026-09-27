@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { resolveKnowledgeMIME } from '@/renderer/services/knowledge/upload';
 import {
-  mergeKnowledgeCitations, parseKnowledgeCitations, stripKnowledgeCitationMarkers,
+  mergeKnowledgeCitations,
+  parseKnowledgeCitations,
+  stripKnowledgeCitationMarkers,
 } from '@/renderer/services/knowledge/citations';
 
 describe('resolveKnowledgeMIME（移植自 client knowledge-upload）', () => {
@@ -13,7 +15,9 @@ describe('resolveKnowledgeMIME（移植自 client knowledge-upload）', () => {
   });
 
   it('声明缺失/未知时按扩展名回退，未知扩展返回空串', () => {
-    expect(resolveKnowledgeMIME({ name: '报告.docx', type: '' })).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(resolveKnowledgeMIME({ name: '报告.docx', type: '' })).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
     expect(resolveKnowledgeMIME({ name: '笔记.md', type: '' })).toBe('text/markdown');
     expect(resolveKnowledgeMIME({ name: '工具.ts', type: '' })).toBe('text/plain');
     expect(resolveKnowledgeMIME({ name: 'virus.exe', type: '' })).toBe('');
@@ -24,12 +28,14 @@ describe('parseKnowledgeCitations / merge / strip（citations.ts 零改动复制
   const docId = '018f0000-0000-7000-8000-0000000000aa';
 
   it('解析 JSON（裸串/text 包装/content 包装）中的结构化引用并去重', () => {
-    const payload = { citations: [
-      { documentId: docId, quote: '要点一', filename: '产品手册.pdf' },
-      { documentId: docId.toUpperCase(), quote: '重复文档' },
-      { documentId: 'not-a-uuid' },
-      'garbage',
-    ] };
+    const payload = {
+      citations: [
+        { documentId: docId, quote: '要点一', filename: '产品手册.pdf' },
+        { documentId: docId.toUpperCase(), quote: '重复文档' },
+        { documentId: 'not-a-uuid' },
+        'garbage',
+      ],
+    };
     expect(parseKnowledgeCitations(JSON.stringify(payload))).toEqual([
       { docId, quote: '要点一', title: '产品手册.pdf' },
     ]);
@@ -41,7 +47,7 @@ describe('parseKnowledgeCitations / merge / strip（citations.ts 零改动复制
   it('merge 按 docId 小写合并，非法 id 剔除', () => {
     const merged = mergeKnowledgeCitations(
       [{ docId: docId, title: '旧标题' }],
-      [{ docId: docId.toUpperCase(), quote: '新引文' }, { docId: 'bad' }],
+      [{ docId: docId.toUpperCase(), quote: '新引文' }, { docId: 'bad' }]
     );
     expect(merged).toEqual([{ docId, title: '旧标题', quote: '新引文' }]);
   });

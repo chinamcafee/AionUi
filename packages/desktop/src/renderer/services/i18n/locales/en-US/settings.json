@@ -412,6 +412,18 @@
   "imageInputSupported": "Enabled by configuration",
   "imageInputUnsupported": "Disabled by configuration",
   "imageInputTip": "Automatic uses catalog capability detection. Enable or disable only to override it.",
+  "modelCapability": {
+    "title": "Model Capabilities",
+    "text": "Text",
+    "vision": "Vision",
+    "embedding": "Embedding",
+    "textLabel": "Text Model",
+    "textDesc": "Chat and text generation",
+    "visionLabel": "Vision Understanding",
+    "visionDesc": "Image input and understanding",
+    "embeddingLabel": "Embedding Model",
+    "embeddingDesc": "For vector retrieval only"
+  },
   "openAiApiMode": "OpenAI request API",
   "openAiApiModeAuto": "API · Auto",
   "openAiApiModeChatCompletions": "Chat Completions",
@@ -1348,7 +1360,7 @@
     "prompt": {
       "createAssistant": "Help me create a new assistant and walk me through setting it up.",
       "addCustomAgent": "Help me add a custom Agent.",
-      "addModel": "Help me add a new LLM provider and API key, then set it as the default model.",
+      "addModel": "Help me add a new model and API key, then set it as the default. If this is an embedding model (e.g. embedding-3, bge-m3, text-embedding-3-small), please enable the 'Embedding Model' capability switch so it's tagged for knowledge retrieval. If it supports vision/image understanding, set 'Image Input' to 'Supported'.",
       "addMcp": "Help me set up an MCP server.",
       "addSkill": "Help me import a skill and attach it to an assistant.",
       "setupRemote": "Help me set up remote access so I can open AionUi from my phone or over the internet.",

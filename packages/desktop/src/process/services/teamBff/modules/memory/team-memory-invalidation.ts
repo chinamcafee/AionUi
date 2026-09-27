@@ -84,7 +84,11 @@ export function stopTeamMemoryInvalidationStream(): void {
   snapshot = initialSnapshot();
 }
 
-async function runStream(input: TeamMemoryInvalidationStreamInput, signal: AbortSignal, streamId: symbol): Promise<void> {
+async function runStream(
+  input: TeamMemoryInvalidationStreamInput,
+  signal: AbortSignal,
+  streamId: symbol
+): Promise<void> {
   let retryMilliseconds = 250;
   while (!signal.aborted && active?.id === streamId) {
     try {
@@ -95,9 +99,17 @@ async function runStream(input: TeamMemoryInvalidationStreamInput, signal: Abort
       if (snapshot.lastEventId > 0) headers.set('Last-Event-ID', String(snapshot.lastEventId));
       const path = `/api/v1/tenants/${encodeURIComponent(input.tenantId)}/teams/${encodeURIComponent(input.teamId)}/events`;
       const response = await fetch(new URL(path, input.baseUrl), {
-        method: 'GET', headers, redirect: 'error', cache: 'no-store', signal,
+        method: 'GET',
+        headers,
+        redirect: 'error',
+        cache: 'no-store',
+        signal,
       });
-      if (!response.ok || !response.body || !response.headers.get('Content-Type')?.toLowerCase().startsWith('text/event-stream')) {
+      if (
+        !response.ok ||
+        !response.body ||
+        !response.headers.get('Content-Type')?.toLowerCase().startsWith('text/event-stream')
+      ) {
         throw new Error(response.status === 401 ? 'SESSION_INVALID' : 'TEAM_MEMORY_EVENT_STREAM_INVALID');
       }
       if (active?.id !== streamId || signal.aborted) return;
@@ -137,13 +149,28 @@ async function consumeSSE(body: ReadableStream<Uint8Array>, signal: AbortSignal,
   }
 }
 
-function readWithAbort(reader: ReadableStreamDefaultReader<Uint8Array>, signal: AbortSignal): Promise<ReadableStreamReadResult<Uint8Array> | null> {
+function readWithAbort(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal
+): Promise<ReadableStreamReadResult<Uint8Array> | null> {
   if (signal.aborted) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
-    const aborted = () => { cleanup(); resolve(null); };
+    const aborted = () => {
+      cleanup();
+      resolve(null);
+    };
     const cleanup = () => signal.removeEventListener('abort', aborted);
     signal.addEventListener('abort', aborted, { once: true });
-    reader.read().then((result) => { cleanup(); resolve(result); }, (error) => { cleanup(); reject(error); });
+    reader.read().then(
+      (result) => {
+        cleanup();
+        resolve(result);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      }
+    );
   });
 }
 
@@ -165,14 +192,14 @@ function handleFrame(frame: string): void {
   if (!Number.isSafeInteger(sequence) || sequence <= snapshot.lastEventId) return;
   snapshot = { ...snapshot, lastEventId: sequence };
   if (!EVENT_NAMES.has(eventName) || data.length === 0) return;
-	const event = parseInvalidationEvent(data.join('\n'));
-	if (!event) return;
-	// Stream sequence and domain revision are independent. A delayed retry can arrive
-	// after newer revisions, so advance Last-Event-ID without regressing diagnostic metadata.
-	if (event.memoryRevision < snapshot.latestRevision) return;
-	snapshot = {
-		...snapshot,
-		latestRevision: event.memoryRevision,
+  const event = parseInvalidationEvent(data.join('\n'));
+  if (!event) return;
+  // Stream sequence and domain revision are independent. A delayed retry can arrive
+  // after newer revisions, so advance Last-Event-ID without regressing diagnostic metadata.
+  if (event.memoryRevision < snapshot.latestRevision) return;
+  snapshot = {
+    ...snapshot,
+    latestRevision: event.memoryRevision,
     dirty: event.memoryRevision > snapshot.observedRevision || snapshot.dirty,
     lastOperation: event.operation,
     lastMemoryId: event.memoryId,
@@ -183,13 +210,26 @@ function handleFrame(frame: string): void {
 
 function parseInvalidationEvent(raw: string): InvalidationEvent | null {
   let value: unknown;
-  try { value = JSON.parse(raw); } catch { return null; }
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  if (typeof record.memoryId !== 'string' || !UUID_PATTERN.test(record.memoryId) ||
-      typeof record.operation !== 'string' || !OPERATIONS.has(record.operation) ||
-      typeof record.memoryRevision !== 'number' || !Number.isSafeInteger(record.memoryRevision) || record.memoryRevision < 0 ||
-      typeof record.activationEpoch !== 'number' || !Number.isSafeInteger(record.activationEpoch) || record.activationEpoch < 1) return null;
+  if (
+    typeof record.memoryId !== 'string' ||
+    !UUID_PATTERN.test(record.memoryId) ||
+    typeof record.operation !== 'string' ||
+    !OPERATIONS.has(record.operation) ||
+    typeof record.memoryRevision !== 'number' ||
+    !Number.isSafeInteger(record.memoryRevision) ||
+    record.memoryRevision < 0 ||
+    typeof record.activationEpoch !== 'number' ||
+    !Number.isSafeInteger(record.activationEpoch) ||
+    record.activationEpoch < 1
+  )
+    return null;
   return {
     memoryId: record.memoryId,
     operation: record.operation as InvalidationEvent['operation'],
@@ -200,7 +240,10 @@ function parseInvalidationEvent(raw: string): InvalidationEvent | null {
 
 function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    if (signal.aborted) { resolve(); return; }
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
     const timer = setTimeout(done, milliseconds);
     timer.unref?.();
     function done() {

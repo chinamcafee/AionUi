@@ -41,22 +41,30 @@ export class TeamConfigStore {
       this.cache = {
         enabled: raw.enabled === true,
         serverBaseUrl: typeof raw.serverBaseUrl === 'string' ? raw.serverBaseUrl : DEFAULT_CONFIG.serverBaseUrl,
-        clientId: typeof raw.clientId === 'string' && /^[A-Za-z0-9._-]{3,128}$/.test(raw.clientId)
-          ? raw.clientId
-          : DEFAULT_CONFIG.clientId,
-        authorizationPageUrl: typeof raw.authorizationPageUrl === 'string' && /^https?:\/\//.test(raw.authorizationPageUrl)
-          ? raw.authorizationPageUrl
-          : undefined,
-        memoryModel: raw.memoryModel && typeof raw.memoryModel === 'object' &&
-          typeof raw.memoryModel.baseUrl === 'string' && typeof raw.memoryModel.apiKey === 'string' &&
-          typeof raw.memoryModel.model === 'string' && raw.memoryModel.baseUrl && raw.memoryModel.apiKey && raw.memoryModel.model
-          ? {
-            baseUrl: raw.memoryModel.baseUrl,
-            apiKey: raw.memoryModel.apiKey,
-            model: raw.memoryModel.model,
-            name: typeof raw.memoryModel.name === 'string' ? raw.memoryModel.name : undefined,
-          }
-          : undefined,
+        clientId:
+          typeof raw.clientId === 'string' && /^[A-Za-z0-9._-]{3,128}$/.test(raw.clientId)
+            ? raw.clientId
+            : DEFAULT_CONFIG.clientId,
+        authorizationPageUrl:
+          typeof raw.authorizationPageUrl === 'string' && /^https?:\/\//.test(raw.authorizationPageUrl)
+            ? raw.authorizationPageUrl
+            : undefined,
+        memoryModel:
+          raw.memoryModel &&
+          typeof raw.memoryModel === 'object' &&
+          typeof raw.memoryModel.baseUrl === 'string' &&
+          typeof raw.memoryModel.apiKey === 'string' &&
+          typeof raw.memoryModel.model === 'string' &&
+          raw.memoryModel.baseUrl &&
+          raw.memoryModel.apiKey &&
+          raw.memoryModel.model
+            ? {
+                baseUrl: raw.memoryModel.baseUrl,
+                apiKey: raw.memoryModel.apiKey,
+                model: raw.memoryModel.model,
+                name: typeof raw.memoryModel.name === 'string' ? raw.memoryModel.name : undefined,
+              }
+            : undefined,
       };
       validatedTeamServerBaseUrl(this.cache.serverBaseUrl);
     } catch {

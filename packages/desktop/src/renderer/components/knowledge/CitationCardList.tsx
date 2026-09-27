@@ -5,7 +5,9 @@ import React, { useEffect, useState } from 'react';
 import { Collapse, Spin, Tag, Typography } from '@arco-design/web-react';
 import { KnowledgeFilePreview } from './FilePreview';
 import {
-  mergeKnowledgeCitations, parseKnowledgeCitations, type KnowledgeCitation,
+  mergeKnowledgeCitations,
+  parseKnowledgeCitations,
+  type KnowledgeCitation,
 } from '@/renderer/services/knowledge/citations';
 
 export const KnowledgeCitationCardList: React.FC<{
@@ -27,15 +29,21 @@ export const KnowledgeCitationCardList: React.FC<{
       <Collapse bordered={false} style={{ marginTop: 8 }}>
         <Collapse.Item
           name='citations'
-          header={(
+          header={
             <Typography.Text size='small' type='secondary'>
               知识引用（{citations.length}）
             </Typography.Text>
-          )}
+          }
         >
           {citations.map((citation) => (
-            <div key={citation.docId} style={{ marginBottom: 6, cursor: 'pointer' }} onClick={() => setPreview(citation)}>
-              <Tag color='arcoblue' size='small'>{citation.title ?? citation.docId.slice(0, 8)}</Tag>
+            <div
+              key={citation.docId}
+              style={{ marginBottom: 6, cursor: 'pointer' }}
+              onClick={() => setPreview(citation)}
+            >
+              <Tag color='arcoblue' size='small'>
+                {citation.title ?? citation.docId.slice(0, 8)}
+              </Tag>
               {citation.quote && (
                 <Typography.Text type='secondary' size='small' style={{ marginLeft: 8 }}>
                   “{citation.quote.length > 120 ? `${citation.quote.slice(0, 120)}…` : citation.quote}”

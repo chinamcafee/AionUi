@@ -21,7 +21,13 @@ interface CardState {
 }
 
 const INITIAL: CardState = {
-  phase: 'running', mode: 'manual', summary: '', operations: [], selectedIds: [], doneDetail: '', error: null,
+  phase: 'running',
+  mode: 'manual',
+  summary: '',
+  operations: [],
+  selectedIds: [],
+  doneDetail: '',
+  error: null,
 };
 
 const OP_META: Record<string, { text: string; color: string }> = {
@@ -44,7 +50,8 @@ export const MemoryConsolidationCard: React.FC = () => {
       if (mode === 'auto') {
         const result = await teamApi.consolidateMemories('all', 'auto');
         setState((s) => ({
-          ...s, phase: 'done',
+          ...s,
+          phase: 'done',
           doneDetail: result.summary || `已执行 ${result.appliedCount} 项操作`,
           operations: result.operations.slice(0, 6),
         }));
@@ -58,8 +65,11 @@ export const MemoryConsolidationCard: React.FC = () => {
         return;
       }
       setState((s) => ({
-        ...s, phase: 'review', summary: result.summary,
-        operations: result.operations, selectedIds: result.operations.map((op) => op.id),
+        ...s,
+        phase: 'review',
+        summary: result.summary,
+        operations: result.operations,
+        selectedIds: result.operations.map((op) => op.id),
       }));
     } catch (err) {
       setState((s) => ({ ...s, phase: 'done', error: err instanceof Error ? err.message : '未知错误' }));
@@ -82,7 +92,12 @@ export const MemoryConsolidationCard: React.FC = () => {
     setState((s) => ({ ...s, phase: 'running' }));
     try {
       const result = await teamApi.applyConsolidation(selected);
-      setState((s) => ({ ...s, phase: 'done', doneDetail: `已应用 ${result.appliedCount} 项操作`, operations: selected }));
+      setState((s) => ({
+        ...s,
+        phase: 'done',
+        doneDetail: `已应用 ${result.appliedCount} 项操作`,
+        operations: selected,
+      }));
       dismissTimer.current = setTimeout(() => setVisible(false), 6000);
     } catch (err) {
       setState((s) => ({ ...s, phase: 'done', error: err instanceof Error ? err.message : '应用失败' }));
@@ -99,18 +114,25 @@ export const MemoryConsolidationCard: React.FC = () => {
   return (
     <div
       style={{
-        margin: '4px 20px 8px', borderRadius: 10,
+        margin: '4px 20px 8px',
+        borderRadius: 10,
         border: '1px solid var(--color-border-2)',
         background: 'var(--color-fill-1)',
-        overflow: 'hidden', fontSize: 13, lineHeight: 1.6,
+        overflow: 'hidden',
+        fontSize: 13,
+        lineHeight: 1.6,
       }}
     >
       {/* 标题栏（始终可见，状态+摘要） */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '10px 16px 6px',
-        borderBottom: state.phase === 'review' || (isDone && hasOps) ? '1px solid var(--color-border-2)' : 'none',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 16px 6px',
+          borderBottom: state.phase === 'review' || (isDone && hasOps) ? '1px solid var(--color-border-2)' : 'none',
+        }}
+      >
         {isRunning ? (
           <IconSync spin style={{ fontSize: 16, color: 'var(--color-primary-6)' }} />
         ) : state.error ? (
@@ -129,7 +151,9 @@ export const MemoryConsolidationCard: React.FC = () => {
           {isDone && state.error}
         </Typography.Text>
         {isDone && (
-          <Button size='mini' type='text' onClick={() => setVisible(false)}>收起</Button>
+          <Button size='mini' type='text' onClick={() => setVisible(false)}>
+            收起
+          </Button>
         )}
       </div>
 
@@ -143,10 +167,15 @@ export const MemoryConsolidationCard: React.FC = () => {
               <div
                 key={op.id}
                 style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 8,
-                  padding: '6px 10px', marginBottom: 4, borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  padding: '6px 10px',
+                  marginBottom: 4,
+                  borderRadius: 6,
                   background: checked ? 'var(--color-primary-light-1)' : 'transparent',
-                  cursor: 'pointer', transition: 'background 0.15s',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
                 }}
                 onClick={() => {
                   setState((s) => ({
@@ -160,8 +189,12 @@ export const MemoryConsolidationCard: React.FC = () => {
                 <Checkbox checked={checked} readOnly style={{ marginTop: 2 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Tag size='small' color={meta.color}>{meta.text}</Tag>
-                    <Typography.Text bold size='small'>{op.title ?? op.targetId.slice(0, 8)}</Typography.Text>
+                    <Tag size='small' color={meta.color}>
+                      {meta.text}
+                    </Tag>
+                    <Typography.Text bold size='small'>
+                      {op.title ?? op.targetId.slice(0, 8)}
+                    </Typography.Text>
                   </div>
                   <Typography.Text type='secondary' size='small' style={{ display: 'block' }}>
                     {op.type === 'merge' && op.sourceIds ? `← 并入 ${op.sourceIds.length} 条源记忆 · ` : ''}
@@ -169,7 +202,8 @@ export const MemoryConsolidationCard: React.FC = () => {
                   </Typography.Text>
                   {op.content && (
                     <Typography.Text type='secondary' size='small' style={{ display: 'block' }}>
-                      {op.content.slice(0, 80)}{op.content.length > 80 ? '…' : ''}
+                      {op.content.slice(0, 80)}
+                      {op.content.length > 80 ? '…' : ''}
                     </Typography.Text>
                   )}
                 </div>
@@ -177,7 +211,9 @@ export const MemoryConsolidationCard: React.FC = () => {
             );
           })}
           <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-            <Button size='small' onClick={() => setVisible(false)}>跳过</Button>
+            <Button size='small' onClick={() => setVisible(false)}>
+              跳过
+            </Button>
             <Button size='small' type='primary' onClick={() => void applySelected()}>
               应用 {state.selectedIds.length} 项
             </Button>
@@ -192,7 +228,9 @@ export const MemoryConsolidationCard: React.FC = () => {
             const meta = OP_META[op.type] ?? { text: op.type, color: 'gray' };
             return (
               <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0' }}>
-                <Tag size='small' color={meta.color}>{meta.text}</Tag>
+                <Tag size='small' color={meta.color}>
+                  {meta.text}
+                </Tag>
                 <Typography.Text size='small'>{op.title ?? op.targetId.slice(0, 8)}</Typography.Text>
               </div>
             );

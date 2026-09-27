@@ -302,32 +302,32 @@ const AppProviders: React.FC<PropsWithChildren> = ({ children }) =>
   React.createElement(
     SWRConfig,
     { value: SWR_DEFAULTS },
-  React.createElement(
-    AuthProvider,
-    null,
     React.createElement(
-      TeamAuthProvider,
+      AuthProvider,
       null,
       React.createElement(
-      ThemeProvider,
+        TeamAuthProvider,
         null,
         React.createElement(
-          PreviewProvider,
+          ThemeProvider,
           null,
           React.createElement(
-            FeedbackProvider,
+            PreviewProvider,
             null,
             React.createElement(
-              React.Fragment,
+              FeedbackProvider,
               null,
-              React.createElement(RuntimeFailureDialogs, null),
-              React.createElement(GpuAutoDisableNotice, null),
-              children
+              React.createElement(
+                React.Fragment,
+                null,
+                React.createElement(RuntimeFailureDialogs, null),
+                React.createElement(GpuAutoDisableNotice, null),
+                children
+              )
             )
           )
         )
       )
-    )
     )
   );
 

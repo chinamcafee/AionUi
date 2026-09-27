@@ -4,7 +4,17 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Card, Empty, Input, List, Message, Modal, Select, Space, Tag, Typography,
+  Button,
+  Card,
+  Empty,
+  Input,
+  List,
+  Message,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Typography,
 } from '@arco-design/web-react';
 import { IconPlus, IconRefresh } from '@arco-design/web-react/icon';
 import { teamApi, TeamApiError, type TeamMemoryCandidate, type TeamMemoryEntry } from '@/renderer/api/teamClient';
@@ -12,7 +22,13 @@ import { useTeamAuth } from '@/renderer/hooks/context/TeamAuthContext';
 
 /** 列表项内嵌最新版本（对象或字符串形态都兼容），取展示字段。 */
 function latestVersionOf(item: TeamMemoryCandidate): Partial<{
-  title: string; content: string; category: string; memoryScope: string; tags: string[]; sourceType: string; submittedAt: string;
+  title: string;
+  content: string;
+  category: string;
+  memoryScope: string;
+  tags: string[];
+  sourceType: string;
+  submittedAt: string;
 }> {
   const raw = (item as { latestVersion?: unknown }).latestVersion;
   if (!raw) return {};
@@ -76,7 +92,10 @@ export const TeamMemoryPanel: React.FC<{
   useEffect(() => {
     void reload();
     const timer = setInterval(() => {
-      void teamApi.teamMemoryInvalidation().then(setInvalidation).catch(() => {});
+      void teamApi
+        .teamMemoryInvalidation()
+        .then(setInvalidation)
+        .catch(() => {});
     }, 5_000);
     return () => clearInterval(timer);
   }, [reload]);
@@ -97,10 +116,26 @@ export const TeamMemoryPanel: React.FC<{
   }, [initialUpgrade, onUpgradeConsumed]);
 
   const submit = useCallback(async () => {
-    const tags = draft.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
+    const tags = draft.tags
+      .split(/[,，]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
     const input = upgradeSource
-      ? { title: draft.title, content: draft.content, category: draft.category, memoryScope: draft.memoryScope as 'chat' | 'code', tags, personalMemoryId: upgradeSource.id }
-      : { title: draft.title, content: draft.content, category: draft.category, memoryScope: draft.memoryScope as 'chat' | 'code', tags };
+      ? {
+          title: draft.title,
+          content: draft.content,
+          category: draft.category,
+          memoryScope: draft.memoryScope as 'chat' | 'code',
+          tags,
+          personalMemoryId: upgradeSource.id,
+        }
+      : {
+          title: draft.title,
+          content: draft.content,
+          category: draft.category,
+          memoryScope: draft.memoryScope as 'chat' | 'code',
+          tags,
+        };
     try {
       const result = (await teamApi.createTeamMemory(input)) as { warning?: string };
       if (result?.warning) {
@@ -119,15 +154,21 @@ export const TeamMemoryPanel: React.FC<{
   return (
     <Card
       title='团队记忆（审批后全团队共享）'
-      extra={(
+      extra={
         <Space>
           {invalidation && (
             <Tag size='small' color={invalidation.connected ? 'green' : 'gray'}>
               {invalidation.connected ? '实时同步' : '离线'}
             </Tag>
           )}
-          {invalidation?.dirty && <Tag size='small' color='orange'>有更新未刷新</Tag>}
-          <Button size='small' icon={<IconRefresh />} onClick={() => void reload()}>刷新</Button>
+          {invalidation?.dirty && (
+            <Tag size='small' color='orange'>
+              有更新未刷新
+            </Tag>
+          )}
+          <Button size='small' icon={<IconRefresh />} onClick={() => void reload()}>
+            刷新
+          </Button>
           {canSubmit && (
             <Button
               size='small'
@@ -143,7 +184,7 @@ export const TeamMemoryPanel: React.FC<{
             </Button>
           )}
         </Space>
-      )}
+      }
     >
       <Typography.Text type='secondary' size='small' style={{ display: 'block', marginBottom: 8 }}>
         审阅/发布/合并工作台在团队管理控制台（设置 → 团队平台 → 打开团队控制台）完成。
@@ -165,28 +206,40 @@ export const TeamMemoryPanel: React.FC<{
             return (
               <List.Item key={memory.id}>
                 <List.Item.Meta
-                  title={(
+                  title={
                     <Space size={8} wrap>
                       <Typography.Text bold>{title}</Typography.Text>
                       <Tag size='small' color={STATUS_COLOR[memory.workflowStatus ?? ''] ?? 'gray'}>
                         {STATUS_LABEL[memory.workflowStatus ?? ''] ?? memory.workflowStatus ?? 'unknown'}
                       </Tag>
-                      {category && <Tag size='small' color='arcoblue'>{category}</Tag>}
+                      {category && (
+                        <Tag size='small' color='arcoblue'>
+                          {category}
+                        </Tag>
+                      )}
                       {scope && <Tag size='small'>{scope === 'code' ? '编码' : '对话'}</Tag>}
-                      {tags.slice(0, 6).map((tag) => <Tag key={tag} size='small'>{tag}</Tag>)}
+                      {tags.slice(0, 6).map((tag) => (
+                        <Tag key={tag} size='small'>
+                          {tag}
+                        </Tag>
+                      ))}
                     </Space>
-                  )}
-                  description={(
+                  }
+                  description={
                     <div>
                       <div>{content || <Typography.Text type='secondary'>（无内容）</Typography.Text>}</div>
                       {version.submittedAt && (
-                        <Typography.Text type='secondary' size='small' style={{ marginTop: 4, display: 'inline-block' }}>
-                          提交于 {new Date(version.submittedAt).toLocaleString()} · 来源 {version.sourceType ?? 'manual'} ·
-                          待 team-admin 审批后生效（draft→pending_review→active）
+                        <Typography.Text
+                          type='secondary'
+                          size='small'
+                          style={{ marginTop: 4, display: 'inline-block' }}
+                        >
+                          提交于 {new Date(version.submittedAt).toLocaleString()} · 来源{' '}
+                          {version.sourceType ?? 'manual'} · 待 team-admin 审批后生效（draft→pending_review→active）
                         </Typography.Text>
                       )}
                     </div>
-                  )}
+                  }
                 />
               </List.Item>
             );
@@ -198,21 +251,48 @@ export const TeamMemoryPanel: React.FC<{
         title={upgradeSource ? `升级个人记忆为团队记忆：${upgradeSource.title}` : '新建团队记忆'}
         visible={modalOpen}
         onOk={() => void submit()}
-        onCancel={() => { setModalOpen(false); setUpgradeSource(null); }}
+        onCancel={() => {
+          setModalOpen(false);
+          setUpgradeSource(null);
+        }}
         okText='提交审批'
       >
         <Space direction='vertical' size='large' style={{ width: '100%' }}>
-          <Input placeholder='标题（<=200 字）' value={draft.title} onChange={(v) => setDraft((d) => ({ ...d, title: v }))} />
-          <Input.TextArea placeholder='内容（<=50000 字）' autoSize={{ minRows: 3, maxRows: 8 }} value={draft.content} onChange={(v) => setDraft((d) => ({ ...d, content: v }))} />
+          <Input
+            placeholder='标题（<=200 字）'
+            value={draft.title}
+            onChange={(v) => setDraft((d) => ({ ...d, title: v }))}
+          />
+          <Input.TextArea
+            placeholder='内容（<=50000 字）'
+            autoSize={{ minRows: 3, maxRows: 8 }}
+            value={draft.content}
+            onChange={(v) => setDraft((d) => ({ ...d, content: v }))}
+          />
           <Space>
-            <Input placeholder='分类（<=80 字）' style={{ width: 140 }} value={draft.category} onChange={(v) => setDraft((d) => ({ ...d, category: v }))} />
-            <Select style={{ width: 120 }} value={draft.memoryScope} options={[{ value: 'chat', label: '对话' }, { value: 'code', label: '编码' }]} onChange={(v) => setDraft((d) => ({ ...d, memoryScope: v }))} />
+            <Input
+              placeholder='分类（<=80 字）'
+              style={{ width: 140 }}
+              value={draft.category}
+              onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
+            />
+            <Select
+              style={{ width: 120 }}
+              value={draft.memoryScope}
+              options={[
+                { value: 'chat', label: '对话' },
+                { value: 'code', label: '编码' },
+              ]}
+              onChange={(v) => setDraft((d) => ({ ...d, memoryScope: v }))}
+            />
           </Space>
-          <Input placeholder='标签（逗号分隔，<=20 个）' value={draft.tags} onChange={(v) => setDraft((d) => ({ ...d, tags: v }))} />
+          <Input
+            placeholder='标签（逗号分隔，<=20 个）'
+            value={draft.tags}
+            onChange={(v) => setDraft((d) => ({ ...d, tags: v }))}
+          />
         </Space>
       </Modal>
     </Card>
   );
 };
-
-

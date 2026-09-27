@@ -412,6 +412,18 @@
   "imageInputSupported": "설정에서 활성화됨",
   "imageInputUnsupported": "설정에서 비활성화됨",
   "imageInputTip": "자동 감지는 카탈로그의 기능 판정을 사용합니다. 재정의할 때만 수동으로 활성화하거나 비활성화하세요.",
+  "modelCapability": {
+    "title": "모델 기능",
+    "text": "텍스트",
+    "vision": "비전",
+    "embedding": "임베딩",
+    "textLabel": "텍스트 모델",
+    "textDesc": "대화 및 텍스트 생성",
+    "visionLabel": "시각 이해",
+    "visionDesc": "이미지 입력 및 이해",
+    "embeddingLabel": "임베딩 모델",
+    "embeddingDesc": "벡터 검색 전용"
+  },
   "openAiApiMode": "OpenAI 요청 API",
   "openAiApiModeAuto": "API · 자동",
   "openAiApiModeChatCompletions": "Chat Completions",
