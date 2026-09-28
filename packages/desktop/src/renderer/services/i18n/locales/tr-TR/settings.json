@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "Ekip Soul",
+    "description": "Ekip yöneticilerinin konsoldan yayınladığı ekip geneli ajan talimatları. Burada salt okunur; imza doğrulamasından sonra her soruya eklenir.",
+    "refresh": "Yenile",
+    "loading": "Yükleniyor…",
+    "fromCache": "Yerel önbellek (doğrulandı)",
+    "fresh": "Ekip sunucusundan eşitlendi",
+    "meta": "Politika v{{policy}} · içerik {{hash}}",
+    "notPublished": "Ekip henüz bir Agent Soul yayınlamadı.",
+    "unavailable": "Ekip Soul şu anda kullanılamıyor (etkin ekip yok veya sunucuya ulaşılamıyor).",
+    "invalid": "Ekip Soul imza doğrulamasını geçemedi ve yok sayıldı ({{code}}).",
+    "fromCacheHint": "Geçerli ekip politikasına göre yeniden doğrulanan yerel önbellek. Zorlamak için Yenile’ye basın.",
+    "freshHint": "Az önce ekip sunucusuyla eşitlendi.",
+    "readonlyHint": "İçerik ekip konsolunda yönetilir; burada salt okunur.",
+    "copy": "İçeriği kopyala",
+    "copied": "Soul içeriği kopyalandı",
+    "copyFailed": "Kopyalama başarısız",
+    "publishHint": "Bir ekip yöneticisi konsolda “Agent Soul” altında yayınlayabilir; sonra burada Yenile’ye basın.",
+    "retryHint": "Daha sonra Yenile ile tekrar deneyin; doğrulanmış önbellek süresi dolana dek geçerli."
+  },
   "title": "Ayarlar",
   "skillsHub": {
     "title": "Beceri Merkezi",
@@ -1426,5 +1446,33 @@
   "crossSessionMessageDesc": "Aracıların diğer sohbetlerinize mesaj göndermesine izin verir. Kapatmak giriş alanındaki @@ sohbet etiketini de devre dışı bırakır.",
   "crossSessionMessageDisabledBanner": "Sohbetler arası mesajlar kapalı, @@ sohbet etiketi kullanılamıyor.",
   "crossSessionMessageResume": "Yeniden aç",
-  "crossSessionMessageUpdateFailed": "Sohbetler arası mesaj ayarı güncellenemedi"
+  "crossSessionMessageUpdateFailed": "Sohbetler arası mesaj ayarı güncellenemedi",
+  "teamPlatformSections": {
+    "access": {
+      "title": "Bağlantı",
+      "description": "Yerel ekip ağ geçidi ve team-server bağlantısı. Varsayılan kapalı; yerel hesaplar etkilenmez.",
+      "gatewayRunning": "Ağ geçidi çalışıyor",
+      "gatewayIdle": "Etkin · oturum yok",
+      "gatewayOff": "Kapalı"
+    },
+    "account": {
+      "title": "Ekip hesabı",
+      "description": "OAuth yetkilendirmesi sistem tarayıcısında tamamlanır ve otomatik olarak AionUi’ye döner.",
+      "signedIn": "Oturum açık",
+      "signedOut": "Oturum yok",
+      "inProgress": "Sürüyor",
+      "loginHint": "Henüz oturum açılmadı. Önce ekip konsolunda platformu başlatıp hesap oluşturun.",
+      "waitingHint": "Tarayıcıda yetkilendirme bekleniyor. Takılırsa oturum açmayı yeniden başlatın."
+    },
+    "model": {
+      "title": "Bellek modeli",
+      "description": "Çıkarım ve birleştirme için OpenAI uyumlu uç nokta; bağlı değilse çıkarım atlanır ve arama sözcüksel olur.",
+      "unbound": "Bağlı değil",
+      "emptyText": "AI Core'da bellek çıkarımı için kullanılabilir bir metin modeli yok (gömme modelleri seçilemez)."
+    },
+    "entry": {
+      "title": "Yetkilendirme ve girişler",
+      "description": "Tarayıcı yetkilendirme sayfası ve ekip konsolu."
+    }
+  }
 }

@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "チーム Soul",
+    "description": "チーム管理者がコンソールで公開するチーム共通のエージェント設定。ここでは読み取り専用で、署名検証後に毎回の問い合わせへ注入されます。",
+    "refresh": "更新",
+    "loading": "読み込み中…",
+    "fromCache": "ローカルキャッシュ（検証済み）",
+    "fresh": "チームサーバーから同期しました",
+    "meta": "ポリシー v{{policy}} · 内容 {{hash}}",
+    "notPublished": "チームはまだ Agent Soul を公開していません。",
+    "unavailable": "チーム Soul を取得できません（アクティブなチームがないか、サーバーに到達できません）。",
+    "invalid": "チーム Soul は署名検証に失敗したため無視されました（{{code}}）。",
+    "fromCacheHint": "現在のチームポリシーで再検証したローカルキャッシュです。更新で強制的に再取得できます。",
+    "freshHint": "チームサーバーと同期したばかりです。",
+    "readonlyHint": "内容はチームコンソールで管理され、ここでは読み取り専用です。",
+    "copy": "内容をコピー",
+    "copied": "Soul の内容をコピーしました",
+    "copyFailed": "コピーに失敗しました",
+    "publishHint": "チーム管理者がコンソールの「Agent Soul」で公開できます。公開後に右上の更新を押してください。",
+    "retryHint": "後で更新ボタンで再試行できます。検証済みキャッシュは有効期限内は引き続き使われます。"
+  },
   "title": "Settings",
   "skillsHub": {
     "title": "スキルハブ",
@@ -1428,5 +1448,33 @@
   "crossSessionMessageDesc": "エージェントが他の会話にメッセージを送れるようにします。オフにすると入力欄の @@ 会話メンションも無効になります。",
   "crossSessionMessageDisabledBanner": "会話間メッセージはオフです。入力欄の @@ 会話メンションは使用できません。",
   "crossSessionMessageResume": "再度オンにする",
-  "crossSessionMessageUpdateFailed": "会話間メッセージ設定の更新に失敗しました"
+  "crossSessionMessageUpdateFailed": "会話間メッセージ設定の更新に失敗しました",
+  "teamPlatformSections": {
+    "access": {
+      "title": "接続",
+      "description": "ローカルのチームゲートウェイと team-server 接続。既定はオフで、ローカルアカウントには影響しません。",
+      "gatewayRunning": "ゲートウェイ稼働中",
+      "gatewayIdle": "有効 · 未ログイン",
+      "gatewayOff": "無効"
+    },
+    "account": {
+      "title": "チームアカウント",
+      "description": "OAuth 認可はシステムブラウザで完了し、自動的に AionUi に戻ります。",
+      "signedIn": "ログイン済み",
+      "signedOut": "未ログイン",
+      "inProgress": "進行中",
+      "loginHint": "未ログインです。先にチームコンソールで初期化とアカウント作成を行ってください。",
+      "waitingHint": "ブラウザでの認可完了を待っています。進まない場合はログインを再開してください。"
+    },
+    "model": {
+      "title": "記憶モデル",
+      "description": "記憶の抽出と整理に使う OpenAI 互換エンドポイント。未設定時は抽出をスキップし、検索は語彙一致に降格します。",
+      "unbound": "未設定",
+      "emptyText": "AI コアにメモリ抽出に使用できるテキストモデルがありません（埋め込みモデルは選択できません）。"
+    },
+    "entry": {
+      "title": "認可と入口",
+      "description": "ブラウザ認可ページとチーム管理コンソール。"
+    }
+  }
 }

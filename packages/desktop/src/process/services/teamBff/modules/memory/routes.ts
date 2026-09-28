@@ -26,6 +26,7 @@ import { getMemory } from './memory-store.js';
 import { accountRuntime } from './account-runtime.js';
 import { callTeamGateway, currentTeamGatewayScope } from './team-gateway-runtime.js';
 import { teamMemoryInvalidationSnapshot } from './team-memory-invalidation.js';
+import { renderTeamSoulSection } from '../soul/service.js';
 import { randomUUID } from 'node:crypto';
 
 function parseTeamMemoryScopeFilter(value: string | undefined): MemoryScope | undefined {
@@ -290,7 +291,11 @@ export function createMemoryRoutes() {
     const result = await retrieveParallelContext(query, scope, body.includeKnowledge !== false, conversationMode, {
       knowledgeOrganizerFilter: normalizeOrganizerFilter(body.knowledgeOrganizerFilter),
     });
-    return c.json({ result, rendered: renderParallelContext(result) });
+    // 团队 Soul（团队统一 Agent 设定）：验签通过时置于上下文最前，作为团队级指令；未发布/不可用则跳过
+    const base = renderParallelContext(result);
+    const soulSection = await renderTeamSoulSection().catch((): null => null);
+    const rendered = soulSection ? (base.trim() ? `${soulSection}\n\n${base}` : soulSection) : base;
+    return c.json({ result, rendered, soul: { injected: Boolean(soulSection) } });
   });
 
   // ── 团队记忆（T3.1/T3.2，只经 team-server Gateway；Renderer 不持有 Access Token）──

@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "团队 Soul",
+    "description": "团队统一设置的 Agent 设定：由团队管理员在控制台发布，本机只读；验签通过后随每次提问注入。",
+    "refresh": "刷新",
+    "loading": "正在读取…",
+    "fromCache": "本机缓存（已验签）",
+    "fresh": "刚从团队服务端同步",
+    "meta": "策略版本 v{{policy}} · 内容 {{hash}}",
+    "notPublished": "团队尚未发布 Agent Soul。",
+    "unavailable": "暂时无法读取团队 Soul（未选择团队或服务不可达）。",
+    "invalid": "团队 Soul 未通过验签，已忽略（{{code}}）。",
+    "fromCacheHint": "来自本机缓存，已按当前团队策略版本重新验签；点击刷新可强制回源。",
+    "freshHint": "刚与团队服务端同步完成。",
+    "readonlyHint": "内容以团队控制台发布为准，此处不可编辑。",
+    "copy": "复制内容",
+    "copied": "Soul 内容已复制",
+    "copyFailed": "复制失败",
+    "publishHint": "可由团队管理员在控制台「Agent Soul」页编写并发布；发布后点右上角刷新即可同步。",
+    "retryHint": "可稍后点右上角刷新重试；本地已验签的缓存仍会在有效期内继续生效。"
+  },
   "title": "设置",
   "skillsHub": {
     "title": "技能中心",
@@ -1427,5 +1447,33 @@
   "crossSessionMessageDesc": "允许 Agent 向你的其他会话发送消息。关闭后，输入框的 @@ 会话提及与投递能力同时停用。",
   "crossSessionMessageDisabledBanner": "跨会话消息已关闭，输入框的 @@ 会话提及不可用。",
   "crossSessionMessageResume": "重新开启",
-  "crossSessionMessageUpdateFailed": "跨会话消息设置更新失败"
+  "crossSessionMessageUpdateFailed": "跨会话消息设置更新失败",
+  "teamPlatformSections": {
+    "access": {
+      "title": "接入",
+      "description": "本地团队网关与 team-server 连接；默认关闭，不影响本地账号使用。",
+      "gatewayRunning": "网关运行中",
+      "gatewayIdle": "已启用 · 未登录",
+      "gatewayOff": "未启用"
+    },
+    "account": {
+      "title": "团队账号",
+      "description": "OAuth 授权在系统浏览器完成，确认后自动返回 AionUi。",
+      "signedIn": "已登录",
+      "signedOut": "未登录",
+      "inProgress": "流程进行中",
+      "loginHint": "尚未登录团队账号；需先在团队控制台完成平台初始化并创建账号。",
+      "waitingHint": "正在等待浏览器完成授权；长时间无响应可重新发起（将生成新的授权请求）。"
+    },
+    "model": {
+      "title": "记忆模型",
+      "description": "记忆抽取与语义整理所需的 OpenAI 兼容端点；未绑定时自动抽取跳过、检索退化为词法匹配。",
+      "unbound": "未绑定",
+      "emptyText": "AI 核心中还没有可用于记忆抽取的文本模型（嵌入模型不可选）。"
+    },
+    "entry": {
+      "title": "授权与入口",
+      "description": "浏览器授权页与团队管理控制台入口。"
+    }
+  }
 }

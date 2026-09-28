@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "Soul da equipe",
+    "description": "Instruções de agente da equipe publicadas pelos administradores no console. Somente leitura aqui; após a verificação da assinatura, são injetadas em cada pergunta.",
+    "refresh": "Atualizar",
+    "loading": "Carregando…",
+    "fromCache": "Cache local (verificado)",
+    "fresh": "Sincronizado do servidor da equipe",
+    "meta": "Política v{{policy}} · conteúdo {{hash}}",
+    "notPublished": "A equipe ainda não publicou um Soul de agente.",
+    "unavailable": "O Soul da equipe está indisponível agora (sem equipe ativa ou servidor inacessível).",
+    "invalid": "O Soul da equipe falhou na verificação de assinatura e foi ignorado ({{code}}).",
+    "fromCacheHint": "Do cache local após reverificar com a política atual da equipe. Atualize para forçar a busca.",
+    "freshHint": "Acabou de sincronizar com o servidor da equipe.",
+    "readonlyHint": "O conteúdo é mantido no console da equipe; aqui é somente leitura.",
+    "copy": "Copiar conteúdo",
+    "copied": "Conteúdo do Soul copiado",
+    "copyFailed": "Falha ao copiar",
+    "publishHint": "Um administrador pode publicar em «Agent Soul» no console; depois atualize aqui.",
+    "retryHint": "Tente novamente pelo botão Atualizar; o cache verificado continua válido até expirar."
+  },
   "title": "Configurações",
   "skillsHub": {
     "title": "Central de Habilidades",
@@ -1429,5 +1449,33 @@
   "crossSessionMessageDesc": "Permite que agentes enviem mensagens para suas outras conversas. Desativar também desliga a menção @@ na caixa de entrada.",
   "crossSessionMessageDisabledBanner": "As mensagens entre conversas estão desativadas, a menção @@ não está disponível.",
   "crossSessionMessageResume": "Ativar novamente",
-  "crossSessionMessageUpdateFailed": "Falha ao atualizar a configuração de mensagens entre conversas"
+  "crossSessionMessageUpdateFailed": "Falha ao atualizar a configuração de mensagens entre conversas",
+  "teamPlatformSections": {
+    "access": {
+      "title": "Conexão",
+      "description": "Gateway local da equipe e vínculo com o team-server. Desativado por padrão; contas locais não são afetadas.",
+      "gatewayRunning": "Gateway em execução",
+      "gatewayIdle": "Ativado · sem sessão",
+      "gatewayOff": "Desativado"
+    },
+    "account": {
+      "title": "Conta da equipe",
+      "description": "A autorização OAuth acontece no navegador do sistema e retorna automaticamente ao AionUi.",
+      "signedIn": "Conectado",
+      "signedOut": "Sem sessão",
+      "inProgress": "Em andamento",
+      "loginHint": "Ainda não conectado. Inicialize a plataforma e crie a conta no console da equipe.",
+      "waitingHint": "Aguardando a autorização no navegador. Se travar, reinicie o login para gerar nova solicitação."
+    },
+    "model": {
+      "title": "Modelo de memória",
+      "description": "Endpoint compatível com OpenAI para extração e consolidação; sem vínculo a extração é ignorada e a busca vira lexical.",
+      "unbound": "Não vinculado",
+      "emptyText": "Nenhum modelo de texto disponível para extração de memória no AI Core (modelos de embedding não são selecionáveis)."
+    },
+    "entry": {
+      "title": "Autorização e acessos",
+      "description": "Página de autorização do navegador e console da equipe."
+    }
+  }
 }

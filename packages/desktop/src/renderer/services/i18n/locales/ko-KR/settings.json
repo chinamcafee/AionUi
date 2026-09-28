@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "팀 Soul",
+    "description": "팀 관리자가 콘솔에서 게시하는 팀 공통 에이전트 설정입니다. 여기서는 읽기 전용이며, 서명 검증 후 모든 질문에 주입됩니다.",
+    "refresh": "새로 고침",
+    "loading": "불러오는 중…",
+    "fromCache": "로컬 캐시(검증됨)",
+    "fresh": "팀 서버에서 동기화됨",
+    "meta": "정책 v{{policy}} · 내용 {{hash}}",
+    "notPublished": "팀이 아직 Agent Soul을 게시하지 않았습니다.",
+    "unavailable": "팀 Soul을 사용할 수 없습니다(활성 팀 없음 또는 서버 연결 불가).",
+    "invalid": "팀 Soul이 서명 검증에 실패하여 무시되었습니다({{code}}).",
+    "fromCacheHint": "현재 팀 정책으로 재검증한 로컬 캐시입니다. 새로 고침으로 강제 재조회할 수 있습니다.",
+    "freshHint": "방금 팀 서버와 동기화되었습니다.",
+    "readonlyHint": "내용은 팀 콘솔에서 관리되며 여기서는 읽기 전용입니다.",
+    "copy": "내용 복사",
+    "copied": "Soul 내용을 복사했습니다",
+    "copyFailed": "복사 실패",
+    "publishHint": "팀 관리자가 콘솔의 “Agent Soul”에서 게시할 수 있습니다. 게시 후 오른쪽 위 새로 고침을 누르세요.",
+    "retryHint": "나중에 새로 고침으로 다시 시도하세요. 검증된 캐시는 만료 전까지 계속 사용됩니다."
+  },
   "title": "설정",
   "skillsHub": {
     "title": "스킬 허브",
@@ -1428,5 +1448,33 @@
   "crossSessionMessageDesc": "에이전트가 다른 대화로 메시지를 보낼 수 있게 합니다. 끄면 입력창의 @@ 대화 멘션도 비활성화됩니다.",
   "crossSessionMessageDisabledBanner": "대화 간 메시지가 꺼져 있어 입력창의 @@ 대화 멘션을 사용할 수 없습니다.",
   "crossSessionMessageResume": "다시 켜기",
-  "crossSessionMessageUpdateFailed": "대화 간 메시지 설정 업데이트에 실패했습니다"
+  "crossSessionMessageUpdateFailed": "대화 간 메시지 설정 업데이트에 실패했습니다",
+  "teamPlatformSections": {
+    "access": {
+      "title": "연결",
+      "description": "로컬 팀 게이트웨이와 team-server 연결. 기본은 꺼짐이며 로컬 계정에는 영향이 없습니다.",
+      "gatewayRunning": "게이트웨이 실행 중",
+      "gatewayIdle": "사용 · 미로그인",
+      "gatewayOff": "사용 안 함"
+    },
+    "account": {
+      "title": "팀 계정",
+      "description": "OAuth 인증은 시스템 브라우저에서 완료되고 자동으로 AionUi로 돌아옵니다.",
+      "signedIn": "로그인됨",
+      "signedOut": "로그인 안 됨",
+      "inProgress": "진행 중",
+      "loginHint": "아직 로그인하지 않았습니다. 먼저 팀 콘솔에서 플랫폼 초기화와 계정 생성을 완료하세요.",
+      "waitingHint": "브라우저 인증 완료를 기다리는 중입니다. 멈추면 로그인을 다시 시작하세요."
+    },
+    "model": {
+      "title": "기억 모델",
+      "description": "기억 추출과 정리에 쓰는 OpenAI 호환 엔드포인트. 미설정 시 추출을 건너뛰고 검색은 어휘 일치로 낮아집니다.",
+      "unbound": "미설정",
+      "emptyText": "AI 코어에 메모리 추출에 사용할 수 있는 텍스트 모델이 없습니다(임베딩 모델은 선택할 수 없습니다)."
+    },
+    "entry": {
+      "title": "인증과 진입점",
+      "description": "브라우저 인증 페이지와 팀 관리 콘솔."
+    }
+  }
 }

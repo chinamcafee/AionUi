@@ -8,6 +8,7 @@ import { createMemoryRoutes } from './modules/memory/routes';
 import { createKnowledgeRoutes } from './modules/knowledge/routes';
 import { createAgentToolsRoutes } from './modules/knowledge/agentTools';
 import { createPersonalSyncRoutes } from './modules/personalSync/routes';
+import { createSoulRoutes } from './modules/soul/routes';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -113,6 +114,9 @@ export function createTeamBffApp(service: TeamBffService) {
 
   // ── 个人记忆云备份（/teamapi/personal-sync/*）───────────
   app.route('/teamapi', createPersonalSyncRoutes());
+
+  // ── 团队 Soul（/teamapi/soul/*，只读展示与注入取数）─────
+  app.route('/teamapi', createSoulRoutes());
 
   return app;
 }

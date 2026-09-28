@@ -6,16 +6,21 @@ export interface TeamApiEnvelopeError {
   code: string;
 }
 
+/** 主进程 AionTeamPlatform/config.json 的渲染层可见形状（团队平台设置页读写）。 */
+interface TeamPlatformBridgeConfig {
+  enabled: boolean;
+  serverBaseUrl: string;
+  clientId: string;
+  authorizationPageUrl?: string;
+  memoryModel?: { baseUrl: string; apiKey: string; model: string; name?: string };
+}
+
 declare global {
   interface Window {
     __teamBffPort?: number;
     __teamAuthBridge?: {
-      getConfig: () => Promise<{ enabled: boolean; serverBaseUrl: string; clientId: string }>;
-      setConfig: (patch: {
-        enabled?: boolean;
-        serverBaseUrl?: string;
-        clientId?: string;
-      }) => Promise<{ enabled: boolean; serverBaseUrl: string; clientId: string }>;
+      getConfig: () => Promise<TeamPlatformBridgeConfig>;
+      setConfig: (patch: Partial<TeamPlatformBridgeConfig>) => Promise<TeamPlatformBridgeConfig>;
       beginLogin: () => Promise<unknown>;
       logout: () => Promise<unknown>;
       getStatus: () => Promise<unknown>;
@@ -281,7 +286,24 @@ export const teamApi = {
     }),
   personalSyncCreateSnapshot: () =>
     request<{ throughServerSeq: number; sizeBytes: number }>('/teamapi/personal-sync/snapshots', { method: 'POST' }),
+  /** 团队 Soul（团队统一 Agent 设定）：只读；不可用时 soul 为 null 并带 reason。 */
+  getTeamSoul: (refresh = false) =>
+    request<{ soul: TeamSoulView | null; reason: string | null }>(
+      `/teamapi/soul/current${refresh ? '?refresh=1' : ''}`
+    ),
 };
+
+export interface TeamSoulView {
+  versionId: string;
+  versionNo: number | null;
+  soulVersion: number;
+  teamPolicyVersion: number;
+  contentHash: string;
+  content: string;
+  publishedAt: string | null;
+  expiresAt: string;
+  fromCache: boolean;
+}
 
 export interface TeamPersonalSyncDevice {
   id: string;

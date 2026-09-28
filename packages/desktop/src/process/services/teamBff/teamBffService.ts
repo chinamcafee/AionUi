@@ -86,6 +86,20 @@ export class TeamBffService {
       bindAccountRuntime(this.accountRuntime)
     );
     void import('./modules/memory/team-gateway-runtime').then(({ bindTeamGateway }) => bindTeamGateway(this.gateway));
+    // 团队 Soul（移植 client-reference 的 BFF 原语）：按 bootstrap 的 teamPolicy 版本验签，缓存到本地
+    void import('./modules/soul/service').then((soul) => {
+      soul.configureSoul({
+        userDataPath: deps.userDataPath,
+        getBaseUrl: async () => (await this.config.get()).serverBaseUrl,
+        getTeamPolicyVersion: () => this.cachedBootstrap?.versions?.teamPolicy ?? null,
+        refreshTeamPolicyVersion: async () => {
+          const { apiClient } = await this.ensureManagers();
+          const bootstrap = await apiClient.bootstrap();
+          this.cachedBootstrap = bootstrap;
+          return bootstrap.versions?.teamPolicy ?? null;
+        },
+      });
+    });
     void import('./modules/memory/memory-model-util').then(({ bindMemoryModelProvider }) =>
       bindMemoryModelProvider(async () => (await this.config.get()).memoryModel ?? null)
     );

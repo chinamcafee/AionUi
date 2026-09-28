@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "團隊 Soul",
+    "description": "團隊統一設定的 Agent 設定：由團隊管理員在控制台發布，本機唯讀；驗簽通過後隨每次提問注入。",
+    "refresh": "重新整理",
+    "loading": "正在讀取…",
+    "fromCache": "本機快取（已驗簽）",
+    "fresh": "剛從團隊伺服器同步",
+    "meta": "策略版本 v{{policy}} · 內容 {{hash}}",
+    "notPublished": "團隊尚未發布 Agent Soul。",
+    "unavailable": "暫時無法讀取團隊 Soul（未選擇團隊或服務無法連線）。",
+    "invalid": "團隊 Soul 未通過驗簽，已忽略（{{code}}）。",
+    "fromCacheHint": "來自本機快取，已依目前團隊策略版本重新驗簽；點重新整理可強制回源。",
+    "freshHint": "剛與團隊伺服器同步完成。",
+    "readonlyHint": "內容以團隊控制台發布為準，此處不可編輯。",
+    "copy": "複製內容",
+    "copied": "Soul 內容已複製",
+    "copyFailed": "複製失敗",
+    "publishHint": "可由團隊管理員在控制台「Agent Soul」頁撰寫並發布；發布後點右上角重新整理即可同步。",
+    "retryHint": "可稍後點右上角重新整理重試；本機已驗簽的快取仍在有效期內繼續生效。"
+  },
   "title": "Settings",
   "skillsHub": {
     "title": "技能中心",
@@ -1428,5 +1448,33 @@
   "crossSessionMessageDesc": "允許 Agent 向你的其他對話傳送訊息。關閉後，輸入框的 @@ 對話提及與投遞功能會同時停用。",
   "crossSessionMessageDisabledBanner": "跨對話訊息已關閉，輸入框的 @@ 對話提及不可用。",
   "crossSessionMessageResume": "重新開啟",
-  "crossSessionMessageUpdateFailed": "跨對話訊息設定更新失敗"
+  "crossSessionMessageUpdateFailed": "跨對話訊息設定更新失敗",
+  "teamPlatformSections": {
+    "access": {
+      "title": "接入",
+      "description": "本機團隊閘道與 team-server 連線；預設關閉，不影響本機帳號使用。",
+      "gatewayRunning": "閘道運行中",
+      "gatewayIdle": "已啟用 · 未登入",
+      "gatewayOff": "未啟用"
+    },
+    "account": {
+      "title": "團隊帳號",
+      "description": "OAuth 授權在系統瀏覽器完成，確認後自動返回 AionUi。",
+      "signedIn": "已登入",
+      "signedOut": "未登入",
+      "inProgress": "流程進行中",
+      "loginHint": "尚未登入團隊帳號；需先在團隊控制台完成平台初始化並建立帳號。",
+      "waitingHint": "正在等待瀏覽器完成授權；長時間無回應可重新發起（將產生新的授權請求）。"
+    },
+    "model": {
+      "title": "記憶模型",
+      "description": "記憶抽取與語意整理所需的 OpenAI 相容端點；未綁定時自動抽取會跳過、檢索退化為詞法比對。",
+      "unbound": "未綁定",
+      "emptyText": "AI 核心中還沒有可用於記憶抽取的文字模型（嵌入模型不可選）。"
+    },
+    "entry": {
+      "title": "授權與入口",
+      "description": "瀏覽器授權頁與團隊管理控制台入口。"
+    }
+  }
 }

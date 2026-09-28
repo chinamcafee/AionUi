@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "Soul d’équipe",
+    "description": "Instructions d'agent d'équipe publiées par les administrateurs dans la console. En lecture seule ici ; après vérification de la signature, elles sont injectées à chaque requête.",
+    "refresh": "Actualiser",
+    "loading": "Chargement…",
+    "fromCache": "Cache local (vérifié)",
+    "fresh": "Synchronisé depuis le serveur d’équipe",
+    "meta": "Politique v{{policy}} · contenu {{hash}}",
+    "notPublished": "L'équipe n'a pas encore publié de Soul d'agent.",
+    "unavailable": "Le Soul d'équipe est indisponible (aucune équipe active ou serveur injoignable).",
+    "invalid": "Le Soul d'équipe n'a pas passé la vérification de signature et a été ignoré ({{code}}).",
+    "fromCacheHint": "Depuis le cache local après revérification selon la politique d’équipe actuelle. Actualisez pour forcer la récupération.",
+    "freshHint": "Vient d’être synchronisé avec le serveur d’équipe.",
+    "readonlyHint": "Le contenu est géré dans la console d’équipe ; lecture seule ici.",
+    "copy": "Copier le contenu",
+    "copied": "Contenu du Soul copié",
+    "copyFailed": "Échec de la copie",
+    "publishHint": "Un administrateur peut le publier dans « Agent Soul » de la console, puis actualisez ici.",
+    "retryHint": "Réessayez via Actualiser plus tard ; le cache vérifié reste valide jusqu’à expiration."
+  },
   "title": "Paramètres",
   "skillsHub": {
     "title": "Centre de compétences",
@@ -1426,5 +1446,33 @@
   "crossSessionMessageDesc": "Permet aux agents d'envoyer des messages à vos autres conversations. La désactivation coupe aussi la mention @@ dans la zone de saisie.",
   "crossSessionMessageDisabledBanner": "Les messages entre conversations sont désactivés, la mention @@ est indisponible.",
   "crossSessionMessageResume": "Réactiver",
-  "crossSessionMessageUpdateFailed": "Échec de la mise à jour du réglage des messages entre conversations"
+  "crossSessionMessageUpdateFailed": "Échec de la mise à jour du réglage des messages entre conversations",
+  "teamPlatformSections": {
+    "access": {
+      "title": "Connexion",
+      "description": "Passerelle locale d’équipe et lien team-server. Désactivé par défaut ; les comptes locaux ne sont pas affectés.",
+      "gatewayRunning": "Passerelle active",
+      "gatewayIdle": "Activée · non connecté",
+      "gatewayOff": "Désactivée"
+    },
+    "account": {
+      "title": "Compte d’équipe",
+      "description": "L’autorisation OAuth se fait dans le navigateur système et revient automatiquement dans AionUi.",
+      "signedIn": "Connecté",
+      "signedOut": "Non connecté",
+      "inProgress": "En cours",
+      "loginHint": "Pas encore connecté. Initialisez la plateforme et créez le compte dans la console d’équipe.",
+      "waitingHint": "En attente de l’autorisation dans le navigateur. En cas de blocage, relancez la connexion."
+    },
+    "model": {
+      "title": "Modèle de mémoire",
+      "description": "Point de terminaison compatible OpenAI pour l’extraction et la consolidation ; sans liaison, extraction ignorée et recherche lexicale.",
+      "unbound": "Non lié",
+      "emptyText": "Aucun modèle de texte disponible pour l'extraction de mémoire dans AI Core (les modèles d'embedding ne sont pas sélectionnables)."
+    },
+    "entry": {
+      "title": "Autorisation et accès",
+      "description": "Page d’autorisation du navigateur et console d’équipe."
+    }
+  }
 }

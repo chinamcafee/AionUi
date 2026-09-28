@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "Team-Soul",
+    "description": "Teamweite Agent-Vorgaben, veröffentlicht von Team-Admins in der Konsole. Hier schreibgeschützt; nach Signaturprüfung wird sie mit jeder Anfrage injiziert.",
+    "refresh": "Aktualisieren",
+    "loading": "Wird geladen…",
+    "fromCache": "Lokaler Cache (verifiziert)",
+    "fresh": "Vom Team-Server synchronisiert",
+    "meta": "Policy v{{policy}} · Inhalt {{hash}}",
+    "notPublished": "Das Team hat noch keinen Agent-Soul veröffentlicht.",
+    "unavailable": "Team-Soul ist derzeit nicht verfügbar (kein aktives Team oder Server nicht erreichbar).",
+    "invalid": "Team-Soul hat die Signaturprüfung nicht bestanden und wurde ignoriert ({{code}}).",
+    "fromCacheHint": "Aus dem lokalen Cache nach erneuter Prüfung gegen die aktuelle Team-Policy-Version. Zum Erzwingen aktualisieren.",
+    "freshHint": "Gerade mit dem Team-Server synchronisiert.",
+    "readonlyHint": "Der Inhalt wird in der Team-Konsole gepflegt und ist hier schreibgeschützt.",
+    "copy": "Inhalt kopieren",
+    "copied": "Soul-Inhalt kopiert",
+    "copyFailed": "Kopieren fehlgeschlagen",
+    "publishHint": "Ein Team-Admin kann ihn unter „Agent Soul“ in der Konsole veröffentlichen; danach hier aktualisieren.",
+    "retryHint": "Später über Aktualisieren erneut versuchen; ein gültiger verifizierter Cache bleibt aktiv."
+  },
   "title": "Einstellungen",
   "skillsHub": {
     "title": "Skills-Hub",
@@ -1426,5 +1446,33 @@
   "crossSessionMessageDesc": "Erlaubt Agenten, Nachrichten an Ihre anderen Unterhaltungen zu senden. Beim Ausschalten wird auch die @@-Erwähnung im Eingabefeld deaktiviert.",
   "crossSessionMessageDisabledBanner": "Nachrichten zwischen Unterhaltungen sind aus, die @@-Erwähnung ist nicht verfügbar.",
   "crossSessionMessageResume": "Wieder einschalten",
-  "crossSessionMessageUpdateFailed": "Einstellung konnte nicht aktualisiert werden"
+  "crossSessionMessageUpdateFailed": "Einstellung konnte nicht aktualisiert werden",
+  "teamPlatformSections": {
+    "access": {
+      "title": "Verbindung",
+      "description": "Lokales Team-Gateway und team-server-Verbindung. Standardmäßig aus; lokale Konten bleiben unberührt.",
+      "gatewayRunning": "Gateway läuft",
+      "gatewayIdle": "Aktiviert · abgemeldet",
+      "gatewayOff": "Deaktiviert"
+    },
+    "account": {
+      "title": "Team-Konto",
+      "description": "Die OAuth-Autorisierung erfolgt im Systembrowser und kehrt automatisch zu AionUi zurück.",
+      "signedIn": "Angemeldet",
+      "signedOut": "Abgemeldet",
+      "inProgress": "Läuft",
+      "loginHint": "Noch nicht angemeldet. Zuerst Plattform initialisieren und Konto in der Team-Konsole anlegen.",
+      "waitingHint": "Warte auf Abschluss der Autorisierung im Browser. Bei Stillstand Anmeldung erneut starten."
+    },
+    "model": {
+      "title": "Erinnerungsmodell",
+      "description": "OpenAI-kompatibler Endpunkt für Extraktion und Konsolidierung; ohne Bindung entfällt die Extraktion und die Suche wird lexikalisch.",
+      "unbound": "Nicht gebunden",
+      "emptyText": "Kein Textmodell für die Gedächtnisextraktion im AI-Kern verfügbar (Embedding-Modelle sind nicht wählbar)."
+    },
+    "entry": {
+      "title": "Autorisierung & Einstiege",
+      "description": "Browser-Autorisierungsseite und Team-Konsole."
+    }
+  }
 }

@@ -1,4 +1,24 @@
 {
+  "teamSoul": {
+    "title": "Team Soul",
+    "description": "Team-wide agent instructions published by team admins in the console. Read-only here; after signature verification it is injected with every prompt.",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "fromCache": "Local cache (verified)",
+    "fresh": "Synced from team server",
+    "meta": "Policy v{{policy}} · content {{hash}}",
+    "notPublished": "The team has not published an agent Soul yet.",
+    "unavailable": "Team Soul is not available right now (no active team or server unreachable).",
+    "invalid": "Team Soul failed signature verification and was ignored ({{code}}).",
+    "fromCacheHint": "Served from the local cache after re-verifying against the current team policy version. Refresh to force a re-fetch.",
+    "freshHint": "Just synced from the team server.",
+    "readonlyHint": "Content is owned by the team console and is read-only here.",
+    "copy": "Copy content",
+    "copied": "Soul content copied",
+    "copyFailed": "Copy failed",
+    "publishHint": "A team admin can author and publish it under “Agent Soul” in the console; then refresh here.",
+    "retryHint": "Retry with the refresh button later; a still-valid verified cache keeps working."
+  },
   "title": "Settings",
   "skillsHub": {
     "title": "Skills Hub",
@@ -1426,5 +1446,33 @@
   "crossSessionMessageDesc": "Let agents send messages to your other conversations. Turning this off also disables the @@ conversation mention in the input box.",
   "crossSessionMessageDisabledBanner": "Cross-conversation messages are off, so the @@ conversation mention is unavailable.",
   "crossSessionMessageResume": "Turn back on",
-  "crossSessionMessageUpdateFailed": "Failed to update the cross-conversation message setting"
+  "crossSessionMessageUpdateFailed": "Failed to update the cross-conversation message setting",
+  "teamPlatformSections": {
+    "access": {
+      "title": "Connection",
+      "description": "Local team gateway and team-server link. Off by default; local accounts are unaffected.",
+      "gatewayRunning": "Gateway running",
+      "gatewayIdle": "Enabled · signed out",
+      "gatewayOff": "Disabled"
+    },
+    "account": {
+      "title": "Team account",
+      "description": "OAuth authorization happens in your system browser and returns to AionUi automatically.",
+      "signedIn": "Signed in",
+      "signedOut": "Signed out",
+      "inProgress": "In progress",
+      "loginHint": "Not signed in yet. Initialize the platform and create an account in the team console first.",
+      "waitingHint": "Waiting for the browser to finish authorization. If it stalls, restart login to issue a new request."
+    },
+    "model": {
+      "title": "Memory model",
+      "description": "OpenAI-compatible endpoint used for memory extraction and semantic consolidation; without it, extraction is skipped and search falls back to lexical matching.",
+      "unbound": "Not bound",
+      "emptyText": "No text model available for memory extraction in AI Core (embedding models are not selectable)."
+    },
+    "entry": {
+      "title": "Authorization & entry points",
+      "description": "Browser authorization page and the team management console."
+    }
+  }
 }
