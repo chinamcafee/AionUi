@@ -17,10 +17,14 @@ import { generateText, type LanguageModel } from 'ai';
 import {
   listMemories,
   listMemoryAccessLogs,
+  listMemoryCategories,
+  createMemoryCategory,
+  findMemoryCategoryByName,
+  countMemoriesByCategory,
   updateMemory,
   deleteMemory,
   recordRun,
-  type MemoryCategory,
+  MAX_CATEGORY_NAME_LENGTH,
   type MemoryEntry,
   type MemoryScope,
 } from './memory-store.js';
@@ -48,6 +52,11 @@ export interface ConsolidateResult {
 export type ConsolidationScope = MemoryScope | 'all';
 export type ConsolidationMode = 'auto' | 'review';
 
+/** 单次整理最多新建分类数（决策 D5） */
+export const MAX_NEW_CATEGORIES_PER_RUN = 10;
+/** 整理提示词最多注入的分类条数（决策 D5：超出按引用记忆数取前 N） */
+export const MAX_PROMPT_CATEGORIES = 100;
+
 export type ConsolidationOperation =
   | {
       id: string;
@@ -58,7 +67,10 @@ export type ConsolidationOperation =
       sourceBaseVersions?: Record<string, number>;
       title: string;
       content: string;
-      category?: MemoryCategory;
+      /** 分类 id；null=未分类（undefined=不改） */
+      categoryId?: string | null;
+      /** 本次计划内新建分类的名称引用（与 create_category 配套） */
+      categoryName?: string;
       reason: string;
     }
   | {
@@ -68,7 +80,8 @@ export type ConsolidationOperation =
       baseVersion?: number;
       title?: string;
       content?: string;
-      category?: MemoryCategory;
+      categoryId?: string | null;
+      categoryName?: string;
       reason: string;
     }
   | {
@@ -77,7 +90,20 @@ export type ConsolidationOperation =
       targetId: string;
       baseVersion?: number;
       reason: string;
+    }
+  | {
+      id: string;
+      type: 'create_category';
+      name: string;
+      description?: string;
+      reason: string;
     };
+
+/** 现役分类上下文（整理解析用）：ids 供 categoryId 校验；names 供新建判重 */
+export interface ConsolidationCategoryContext {
+  ids: ReadonlySet<string>;
+  names: ReadonlySet<string>;
+}
 
 export interface ConsolidationPlan {
   summary: string;
@@ -92,19 +118,27 @@ const SCOPE_LABEL: Record<ConsolidationScope, string> = {
 
 const CONSOLIDATE_PROMPT = (
   scopeLabel: string,
-  memories: string
-) => `你是一个记忆整理助手。下面是用户的${scopeLabel}条目列表（JSON）。
+  memories: string,
+  categoriesText: string
+) => `你是一个记忆整理助手。下面是用户的${scopeLabel}条目列表（JSON）与现有分类清单。
 请输出可以直接执行的结构化整理计划，而不是只给建议文本。
 
 允许的操作：
 1. merge：把语义重复或高度重叠的多条记忆合并到 targetId，并删除 sourceIds。
-2. update：修正单条记忆的 title/content/category。
-3. delete：删除明显无意义、过期、测试碎片或冗余条目。
+2. update：修正单条记忆的 title/content/categoryId。
+3. create_category：现有分类都不合适、且该主题会长期沉淀记忆时，先新建一个分类。
+4. delete：删除明显无意义、过期、测试碎片或冗余条目。
 
-分类只能使用：preference、fact、requirement、event。不要输出其他分类；例如测试碎片应 delete，而不是改成 test。
-不要编造事实；合并后的 content 只能来自原始条目内容。
+分类规则（重要）：
+- 优先复用现有分类：在 merge/update 中用 "categoryId" 指定（null 表示未分类）。
+- 确需新分类：先输出一条 create_category，再在同一次输出的 merge/update 里用 "categoryName" 引用该新分类名。
+- 本次最多新建 ${MAX_NEW_CATEGORIES_PER_RUN} 个分类，分类名不超过 ${MAX_CATEGORY_NAME_LENGTH} 字；不要为单条零散记忆新建分类。
+- 分类是归档维度：不要为了让分类"更整齐"而改动记忆内容，也绝不要编造新分类之外的措施。
 
-记忆条目：
+现有分类（id | 名称 | 说明）：
+${categoriesText || '（暂无）'}
+
+记忆条目（categoryId 为 null 表示未分类）：
 ${memories}
 
 只输出 JSON，不要 markdown 代码块：
@@ -112,12 +146,19 @@ ${memories}
   "summary": "中文摘要，120字以内",
   "operations": [
     {
+      "type": "create_category",
+      "name": "新分类名",
+      "description": "可选：一句话说明什么内容该归到这里",
+      "reason": "为什么新建"
+    },
+    {
       "type": "merge",
       "targetId": "保留的记忆id",
       "sourceIds": ["被合并后删除的记忆id"],
       "title": "合并后标题",
       "content": "合并后完整内容",
-      "category": "preference|fact|requirement|event",
+      "categoryId": "现有分类id或null",
+      "categoryName": "可选：引用本次新建的分类名",
       "reason": "为什么合并"
     },
     {
@@ -125,7 +166,8 @@ ${memories}
       "id": "记忆id",
       "title": "可选新标题",
       "content": "可选新内容",
-      "category": "可选分类",
+      "categoryId": "可选：现有分类id或null",
+      "categoryName": "可选：引用本次新建的分类名",
       "reason": "为什么更新"
     },
     {
@@ -136,8 +178,6 @@ ${memories}
   ]
 }
 如果无需整理，operations 返回空数组。`;
-
-const VALID_CATEGORIES: MemoryCategory[] = new Set(['preference', 'fact', 'requirement', 'event']);
 
 export function groupMemoriesByScope(all: MemoryEntry[]): Record<MemoryScope, MemoryEntry[]> {
   return {
@@ -210,8 +250,31 @@ function extractJsonObject(text: string): string {
   return candidate;
 }
 
-function hasValidCategory(value: unknown): value is MemoryCategory {
-  return typeof value === 'string' && VALID_CATEGORIES.has(value as MemoryCategory);
+const EMPTY_CATEGORY_CONTEXT: ConsolidationCategoryContext = { ids: new Set(), names: new Set() };
+
+function normalizeCategoryName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ');
+}
+
+/** 解析分类指派：现有 id 优先；否则引用本次计划内新建的分类名；未知一律忽略（不改分类） */
+function parseCategoryAssignment(
+  op: Record<string, unknown>,
+  context: ConsolidationCategoryContext,
+  plannedNames: ReadonlySet<string>
+): { categoryId?: string | null; categoryName?: string } {
+  const assignment: { categoryId?: string | null; categoryName?: string } = {};
+  if (op.categoryId !== undefined) {
+    if (op.categoryId === null) assignment.categoryId = null;
+    else if (typeof op.categoryId === 'string' && context.ids.has(op.categoryId)) assignment.categoryId = op.categoryId;
+  }
+  if (
+    assignment.categoryId === undefined &&
+    typeof op.categoryName === 'string' &&
+    plannedNames.has(normalizeCategoryName(op.categoryName).toLowerCase())
+  ) {
+    assignment.categoryName = normalizeCategoryName(op.categoryName);
+  }
+  return assignment;
 }
 
 function opId(type: string, ids: string[]): string {
@@ -221,7 +284,8 @@ function opId(type: string, ids: string[]): string {
 export function parseConsolidationPlan(
   rawText: string,
   validIds: string[],
-  versions: Readonly<Record<string, number>> = {}
+  versions: Readonly<Record<string, number>> = {},
+  categories: ConsolidationCategoryContext = EMPTY_CATEGORY_CONTEXT
 ): ConsolidationPlan {
   const valid = new Set(validIds);
   try {
@@ -229,8 +293,30 @@ export function parseConsolidationPlan(
     const operations: ConsolidationOperation[] = [];
     const rawOps = Array.isArray(parsed.operations) ? parsed.operations : [];
 
+    // 第一遍：收集计划内新建分类（供 categoryName 引用），去重、上限 MAX_NEW_CATEGORIES_PER_RUN
+    const plannedNames = new Set<string>();
     for (const rawOp of rawOps) {
       const op = rawOp as Record<string, unknown>;
+      if (op.type !== 'create_category') continue;
+      const name = typeof op.name === 'string' ? normalizeCategoryName(op.name) : '';
+      if (!name || name.length > MAX_CATEGORY_NAME_LENGTH) continue;
+      if (categories.names.has(name.toLowerCase()) || plannedNames.has(name.toLowerCase())) continue;
+      if (plannedNames.size >= MAX_NEW_CATEGORIES_PER_RUN) continue;
+      plannedNames.add(name.toLowerCase());
+      operations.push({
+        id: opId('create-category', [name]),
+        type: 'create_category',
+        name,
+        ...(typeof op.description === 'string' && op.description.trim()
+          ? { description: op.description.trim().slice(0, 200) }
+          : {}),
+        reason: typeof op.reason === 'string' && op.reason.trim() ? op.reason.trim() : '现有分类不合适，新建分类归档',
+      });
+    }
+
+    for (const rawOp of rawOps) {
+      const op = rawOp as Record<string, unknown>;
+      if (op.type === 'create_category') continue;
       if (op.type === 'merge') {
         const targetId = typeof op.targetId === 'string' ? op.targetId : '';
         const sourceIds = Array.isArray(op.sourceIds)
@@ -239,11 +325,9 @@ export function parseConsolidationPlan(
         const title = typeof op.title === 'string' ? op.title.trim() : '';
         const content = typeof op.content === 'string' ? op.content.trim() : '';
         const reason = typeof op.reason === 'string' ? op.reason.trim() : '合并重复或重叠记忆';
-        const category = op.category === undefined ? undefined : op.category;
         if (!valid.has(targetId) || sourceIds.length === 0 || sourceIds.some((id) => !valid.has(id) || id === targetId))
           continue;
         if (!title || !content) continue;
-        if (category !== undefined && !hasValidCategory(category)) continue;
         operations.push({
           id: opId('merge', [targetId, ...sourceIds]),
           type: 'merge',
@@ -255,18 +339,17 @@ export function parseConsolidationPlan(
             : {}),
           title: title.slice(0, 80),
           content,
-          ...(hasValidCategory(category) ? { category } : {}),
+          ...parseCategoryAssignment(op, categories, plannedNames),
           reason,
         });
       } else if (op.type === 'update') {
         const targetId = typeof op.id === 'string' ? op.id : '';
         const title = typeof op.title === 'string' ? op.title.trim() : undefined;
         const content = typeof op.content === 'string' ? op.content.trim() : undefined;
-        const category = op.category === undefined ? undefined : op.category;
         const reason = typeof op.reason === 'string' ? op.reason.trim() : '更新记忆内容';
         if (!valid.has(targetId)) continue;
-        if (category !== undefined && !hasValidCategory(category)) continue;
-        if (!title && !content && !category) continue;
+        const assignment = parseCategoryAssignment(op, categories, plannedNames);
+        if (!title && !content && assignment.categoryId === undefined && !assignment.categoryName) continue;
         operations.push({
           id: targetId,
           type: 'update',
@@ -274,7 +357,7 @@ export function parseConsolidationPlan(
           ...(versions[targetId] ? { baseVersion: versions[targetId] } : {}),
           ...(title ? { title: title.slice(0, 80) } : {}),
           ...(content ? { content } : {}),
-          ...(hasValidCategory(category) ? { category } : {}),
+          ...assignment,
           reason,
         });
       } else if (op.type === 'delete') {
@@ -300,15 +383,46 @@ export function parseConsolidationPlan(
   }
 }
 
+/**
+ * 应用整理操作（决策 D2/D3）：
+ * 1) 先落 create_category（已存在的同名分类直接复用映射，不重复建）→ 名称引用表；
+ * 2) merge/update 的分类指派按「现有 id > 本次新建名」解析，无法解析时不改分类；
+ * 3) 其余乐观锁冲突语义不变。
+ */
 export async function applyConsolidationOperations(operations: ConsolidationOperation[]): Promise<number> {
+  let applied = 0;
+  const createdCategoryIds = new Map<string, string>();
+  for (const op of operations) {
+    if (op.type !== 'create_category') continue;
+    try {
+      const existing = await findMemoryCategoryByName(op.name);
+      if (existing) {
+        createdCategoryIds.set(existing.name.toLowerCase(), existing.id);
+        continue;
+      }
+      const created = await createMemoryCategory({
+        name: op.name,
+        description: op.description ?? null,
+        source: 'consolidated',
+      });
+      createdCategoryIds.set(created.name.toLowerCase(), created.id);
+      applied += 1;
+    } catch {
+      // 名称冲突/超限等：跳过该新建，其引用降级为「不改分类」
+    }
+  }
+  const resolveAssignment = (op: { categoryId?: string | null; categoryName?: string }): string | null | undefined => {
+    if (op.categoryId !== undefined) return op.categoryId;
+    if (op.categoryName) return createdCategoryIds.get(op.categoryName.toLowerCase());
+    return undefined;
+  };
   const existing = await listMemories();
   const current = new Map(existing.map((memory) => [memory.id, memory]));
   const validIds = new Set(current.keys());
-  let applied = 0;
   for (const op of operations) {
+    if (op.type === 'create_category') continue;
     if (op.type === 'merge') {
       if (!validIds.has(op.targetId) || op.sourceIds.some((id) => !validIds.has(id))) continue;
-      if (op.category !== undefined && !hasValidCategory(op.category)) continue;
       if (
         !op.targetBaseVersion ||
         !op.sourceBaseVersions ||
@@ -317,12 +431,13 @@ export async function applyConsolidationOperations(operations: ConsolidationOper
       ) {
         throw new Error('MEMORY_VERSION_CONFLICT');
       }
+      const categoryId = resolveAssignment(op);
       await updateMemory(
         op.targetId,
         {
           title: op.title,
           content: op.content,
-          ...(op.category ? { category: op.category } : {}),
+          ...(categoryId !== undefined ? { categoryId } : {}),
         },
         op.targetBaseVersion
       );
@@ -331,15 +446,15 @@ export async function applyConsolidationOperations(operations: ConsolidationOper
       applied += 1;
     } else if (op.type === 'update') {
       if (!validIds.has(op.targetId)) continue;
-      if (op.category !== undefined && !hasValidCategory(op.category)) continue;
       if (!op.baseVersion || current.get(op.targetId)?.version !== op.baseVersion)
         throw new Error('MEMORY_VERSION_CONFLICT');
+      const categoryId = resolveAssignment(op);
       await updateMemory(
         op.targetId,
         {
           ...(op.title ? { title: op.title } : {}),
           ...(op.content ? { content: op.content } : {}),
-          ...(op.category ? { category: op.category } : {}),
+          ...(categoryId !== undefined ? { categoryId } : {}),
         },
         op.baseVersion
       );
@@ -367,6 +482,19 @@ export async function consolidateMemories(
   const all = scope === 'all' ? await listMemories() : await listMemories(undefined, undefined, scope);
   const beforeCount = all.length;
   const details: string[] = [];
+
+  // 分类上下文：按引用记忆数排序取前 MAX_PROMPT_CATEGORIES 条注入提示词（决策 D5）
+  const [categories, categoryCounts] = await Promise.all([listMemoryCategories(), countMemoriesByCategory()]);
+  const promptCategories = [...categories]
+    .toSorted((a, b) => (categoryCounts.get(b.id) ?? 0) - (categoryCounts.get(a.id) ?? 0) || a.sort - b.sort)
+    .slice(0, MAX_PROMPT_CATEGORIES);
+  const categoriesText = promptCategories
+    .map((category) => `${category.id} | ${category.name} | ${category.description ?? ''}`)
+    .join('\n');
+  const categoryContext: ConsolidationCategoryContext = {
+    ids: new Set(categories.map((category) => category.id)),
+    names: new Set(categories.map((category) => category.name.toLowerCase())),
+  };
 
   // 取绑定模型（未绑定则失败）
   let modelName: string | null = null;
@@ -437,7 +565,7 @@ export async function consolidateMemories(
         ),
         title: target.title,
         content: patch.content,
-        category: target.category,
+        categoryId: target.categoryId,
         reason: '标题完全相同，自动生成合并操作',
       });
     }
@@ -456,17 +584,18 @@ export async function consolidateMemories(
       if (memories.length === 0) continue;
       try {
         const payload = JSON.stringify(
-          memories.map(({ id, title, content, category, scope }) => ({ id, title, content, category, scope }))
+          memories.map(({ id, title, content, categoryId, scope }) => ({ id, title, content, categoryId, scope }))
         );
         const res = await generateText({
           model,
-          prompt: CONSOLIDATE_PROMPT(SCOPE_LABEL[groupScope], payload),
+          prompt: CONSOLIDATE_PROMPT(SCOPE_LABEL[groupScope], payload, categoriesText),
           abortSignal: options.abortSignal,
         });
         const plan = parseConsolidationPlan(
           res.text,
           memories.map((m) => m.id),
-          Object.fromEntries(memories.map((memory) => [memory.id, memory.version]))
+          Object.fromEntries(memories.map((memory) => [memory.id, memory.version])),
+          categoryContext
         );
         operations.push(...plan.operations);
         summaries.push(`${SCOPE_LABEL[groupScope]}：${plan.summary}`);
@@ -485,7 +614,11 @@ export async function consolidateMemories(
   if (mode === 'review') {
     const candidateScopeEntries = scopeEntries.flatMap(([, memories]) => memories);
     const accessLogs = await listMemoryAccessLogs(candidateScopeEntries.map((memory) => memory.id));
-    const handledIds = new Set(operations.flatMap((op) => [op.targetId, ...(op.type === 'merge' ? op.sourceIds : [])]));
+    const handledIds = new Set(
+      operations.flatMap((op) =>
+        op.type === 'create_category' ? [] : [op.targetId, ...(op.type === 'merge' ? op.sourceIds : [])]
+      )
+    );
     const retentionCandidates = buildRetentionCandidates(candidateScopeEntries, accessLogs).filter(
       (candidate) => !handledIds.has(candidate.targetId)
     );
@@ -504,6 +637,14 @@ export async function consolidateMemories(
   }
 
   const appliedCount = mode === 'auto' ? await applyConsolidationOperations(operations) : 0;
+  const createdCategoryCount = operations.filter((op) => op.type === 'create_category').length;
+  if (createdCategoryCount > 0) {
+    details.push(
+      mode === 'auto'
+        ? `本次整理新建了 ${createdCategoryCount} 个分类，已自动应用（可在「管理分类」中改名或归档）。`
+        : `本次整理包含 ${createdCategoryCount} 个新建分类，勾选后一并创建（可在「管理分类」中调整）。`
+    );
+  }
   const finalCount =
     mode === 'auto'
       ? (await listMemories(undefined, undefined, scope === 'all' ? undefined : scope)).length

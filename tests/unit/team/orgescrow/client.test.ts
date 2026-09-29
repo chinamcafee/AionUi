@@ -170,7 +170,7 @@ describe('Escrow main-process recovery orchestration', () => {
     const now = Date.now();
     const payload = {
       id: entityId,
-      category: 'fact',
+      categoryId: 'fact',
       title: 'restored historical memory',
       content: 'only encrypted in transit',
       source: 'manual',

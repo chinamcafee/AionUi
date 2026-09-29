@@ -185,7 +185,7 @@ export async function buildMemoryContextBlock(
 
   const lines = related.map((h) => {
     const m = h.memory;
-    const tag = m.category;
+    const tag = m.categoryId ?? '未分类';
     const pin = m.pinned ? '⭐' : '';
     return `- ${pin}[${tag}] ${m.title}：${m.content}${h.viaGraph ? `（${h.viaGraph}）` : ''}`;
   });
@@ -213,6 +213,6 @@ export async function buildPinnedMemoriesBlock(scope: MemoryScope | MemoryScope[
   const all = await listMemories(undefined, undefined, scope);
   const pinned = all.filter((m) => m.pinned);
   if (pinned.length === 0) return '';
-  const lines = pinned.map((m) => `- ⭐[${m.category}] ${m.title}：${m.content}`);
+  const lines = pinned.map((m) => `- ⭐[${m.categoryId ?? '未分类'}] ${m.title}：${m.content}`);
   return ['## 关于用户的相关记忆', '以下是你已掌握的用户记忆（来自记忆系统，请据此个性化回复）：', ...lines].join('\n');
 }

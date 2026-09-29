@@ -12,20 +12,24 @@
  * （不再使用 process.env.LLM_ENABLED，统一以「模型绑定」页设置为准。）
  */
 import { generateText } from 'ai';
-import { createMemory, type MemoryCategory } from './memory-store.js';
+import { createMemory, listMemoryCategories } from './memory-store.js';
 import { getMemoryModel } from './memory-model-util.js';
 
 const EXTRACT_PROMPT = (
   userInput: string,
-  assistantText: string
+  assistantText: string,
+  categoriesText: string
 ) => `你是一个记忆抽取助手。判断下面这轮对话中，用户是否陈述了值得长期记住的个人偏好、事实、要求或重要事件。
 只抽取**用户主动陈述的、关于用户自身的、稳定可复用的**信息。忽略：闲聊、一次性提问、与用户自身无关的内容。
 
 用户输入：${userInput}
 助手回复：${assistantText}
 
+现有分类（名称 | 说明）：
+${categoriesText || '（暂无）'}
+
 如果值得记忆，输出 JSON（仅一个对象，不要 markdown 代码块）：
-{"title":"简洁标题(<=20字)","content":"完整内容","category":"preference|fact|requirement|event"}
+{"title":"简洁标题(<=20字)","content":"完整内容","categoryName":"可选：从现有分类中选一个最合适的名称，拿不准就省略"}
 如果不值得记忆，仅输出：{"skip":true}`;
 
 export interface ExtractResult {
@@ -55,7 +59,9 @@ export async function autoExtractMemory(userInput: string, assistantText: string
   }
 
   try {
-    const res = await generateText({ model, prompt: EXTRACT_PROMPT(userInput, assistantText) });
+    const categories = await listMemoryCategories().catch((): Awaited<ReturnType<typeof listMemoryCategories>> => []);
+    const categoriesText = categories.map((category) => `${category.name} | ${category.description ?? ''}`).join('\n');
+    const res = await generateText({ model, prompt: EXTRACT_PROMPT(userInput, assistantText, categoriesText) });
     const text = res.text.trim();
     // 容错：剥离可能的 ```json 包裹
     const jsonStr = text
@@ -66,7 +72,7 @@ export async function autoExtractMemory(userInput: string, assistantText: string
       skip?: boolean;
       title?: string;
       content?: string;
-      category?: MemoryCategory;
+      categoryName?: string;
     };
     if (parsed.skip || !parsed.title || !parsed.content) {
       return { status: 'skipped', reason: '模型判定不值得记忆' };
@@ -74,7 +80,7 @@ export async function autoExtractMemory(userInput: string, assistantText: string
     const m = await createMemory({
       title: parsed.title.slice(0, 40),
       content: parsed.content,
-      category: parsed.category ?? 'fact',
+      categoryName: parsed.categoryName,
       source: 'auto',
     });
     return { status: 'created', reason: `已自动抽取（模型：${name}）`, memoryId: m.id };

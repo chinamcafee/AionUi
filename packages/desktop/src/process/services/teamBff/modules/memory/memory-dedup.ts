@@ -14,7 +14,7 @@
  */
 import { generateText } from 'ai';
 import { getMemoryModel } from './memory-model-util.js';
-import { listMemories, type MemoryCategory, type MemoryEntry, type MemoryScope } from './memory-store.js';
+import { listMemories, UNCATEGORIZED_FILTER, type MemoryEntry, type MemoryScope } from './memory-store.js';
 
 /** 相似度四档 */
 export type SimilarityLevel = 'exact' | 'high' | 'partial' | 'none';
@@ -34,19 +34,24 @@ export interface DedupResult {
 interface Candidate {
   title: string;
   content: string;
-  category: MemoryCategory;
+  /** 分类 id；null=未分类（去重只与同分类比对） */
+  categoryId: string | null;
   /** 候选记忆的 scope，去重时只与同 scope 比对，防跨 scope 误判 */
   scope?: MemoryScope;
 }
 
 /**
  * 判定候选记忆与已有记忆的相似度。
- * - 只与同 category + 同 scope 的已有记忆比对（降噪/提速 + 防 cross-scope 误判）。
+ * - 只与同 categoryId + 同 scope 的已有记忆比对（降噪/提速 + 防 cross-scope 误判）。
  * - 未在「模型绑定」页绑定 memory 模型、或调用失败：返回 {level:'none'}，不阻断写入。
  */
 export async function judgeMemorySimilarity(candidate: Candidate): Promise<DedupResult> {
-  // 1. 取同 category + 同 scope 已有记忆
-  const existing = await listMemories(candidate.category, undefined, candidate.scope ?? 'chat');
+  // 1. 取同 categoryId + 同 scope 已有记忆
+  const existing = await listMemories(
+    candidate.categoryId ?? UNCATEGORIZED_FILTER,
+    undefined,
+    candidate.scope ?? 'chat'
+  );
   if (existing.length === 0) return { level: 'none' };
 
   // 2. 取「模型绑定」页绑定的 memory 模型；未绑定 → 降级放行（不阻断写入）
@@ -104,7 +109,7 @@ export const DEDUP_PROMPT = (
 ## 待判定记忆
 标题：${candidate.title}
 内容：${candidate.content}
-分类：${candidate.category}
+分类：${candidate.categoryId ?? '未分类'}
 
 ## 已有记忆列表（仅同分类）
 ${existing.map((m, i) => `#${i} [id:${m.id}] ${m.title} —— ${m.content}`).join('\n')}

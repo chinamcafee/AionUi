@@ -46,7 +46,7 @@ function sha256(value: Buffer | string) {
 async function insertMemory(runtime: AccountRuntimeManager, id: string, title: string, content: string) {
   const now = Date.now();
   await runtime.database('memory').execute({
-    sql: `INSERT INTO memories(id,category,title,content,source,scope,pinned,tenant_id,tenant_member_id,
+    sql: `INSERT INTO memories(id,category_id,title,content,source,scope,pinned,tenant_id,tenant_member_id,
       context_team_id,version,hlc,deleted_at,importance,forget_after,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     args: [
@@ -205,7 +205,7 @@ describe('personal-sync store（移植自 client server/personal-sync-store.ts�
     const now = Date.now();
     const remotePayload: MemorySyncPayload = {
       id: remoteId,
-      category: 'fact',
+      categoryId: 'fact',
       title: '远端设备写入',
       content: '来自另一台设备的记忆',
       source: 'manual',
@@ -278,7 +278,7 @@ describe('personal-sync store（移植自 client server/personal-sync-store.ts�
   it('三次合并：无重叠字段取远端、重叠字段报冲突', () => {
     const base: MemorySyncPayload = {
       id: 'x',
-      category: 'fact',
+      categoryId: 'fact',
       title: 'A',
       content: 'base',
       source: 'manual',

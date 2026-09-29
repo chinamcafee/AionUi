@@ -180,12 +180,12 @@ export async function restorePersonalSyncSnapshot(
       args: [identity.tenantId, identity.tenantMemberId],
     },
     ...payload.memories.map((row) => ({
-      sql: `INSERT INTO memories(id,category,title,content,source,scope,pinned,tenant_id,tenant_member_id,
+      sql: `INSERT INTO memories(id,category_id,title,content,source,scope,pinned,tenant_id,tenant_member_id,
         context_team_id,version,hlc,deleted_at,importance,forget_after,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         row.id,
-        row.category,
+        row.category_id ?? null,
         row.title,
         row.content,
         row.source,

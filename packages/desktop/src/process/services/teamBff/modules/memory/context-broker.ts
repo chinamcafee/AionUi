@@ -56,9 +56,9 @@ function personalRetriever(query: string, scope: MemoryScope | MemoryScope[], li
       mandatory: memory.pinned,
       queryMatched: channels.some((channel) => channel !== 'pinned'),
       semanticType:
-        memory.category === 'requirement'
+        memory.categoryId === 'requirement'
           ? 'personal_requirement'
-          : memory.category === 'preference'
+          : memory.categoryId === 'preference'
             ? 'personal_preference'
             : 'personal_fact',
       ...(viaGraph ? { viaGraph } : {}),

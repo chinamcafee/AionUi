@@ -58,7 +58,7 @@ async function initializeMemoryDatabase(identity: {
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memories (
           id TEXT PRIMARY KEY,
-          category TEXT NOT NULL DEFAULT 'fact',
+          category_id TEXT,
           title TEXT NOT NULL,
           content TEXT NOT NULL,
           source TEXT DEFAULT 'manual',
@@ -86,6 +86,13 @@ async function initializeMemoryDatabase(identity: {
       await database.execute('ALTER TABLE memories ADD COLUMN last_recalled_at INTEGER').catch(() => {});
       await database.execute('ALTER TABLE memories ADD COLUMN recall_count INTEGER NOT NULL DEFAULT 0').catch(() => {});
       await database.execute('ALTER TABLE memories ADD COLUMN forget_after INTEGER').catch(() => {});
+      // 分类体系（2026-09-29）：category 枚举列 → category_id（种子分类 id 沿用旧枚举值，回填后删除旧列）
+      await database.execute('ALTER TABLE memories ADD COLUMN category_id TEXT').catch(() => {});
+      await database
+        .execute('UPDATE memories SET category_id = category WHERE category_id IS NULL AND category IS NOT NULL')
+        .catch(() => {});
+      await database.execute('DROP INDEX IF EXISTS idx_memories_category').catch(() => {});
+      await database.execute('ALTER TABLE memories DROP COLUMN category').catch(() => {});
       // T2.6 访问时间戳环形缓冲（每条记忆保留最近 RETENTION.accessCap 条，插入后裁剪）
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memory_access_log (
@@ -105,10 +112,53 @@ async function initializeMemoryDatabase(identity: {
         'SELECT hlc FROM memories WHERE hlc IS NOT NULL ORDER BY hlc DESC LIMIT 1'
       );
       if (latestHlc.rows[0]?.hlc) observeHlc(String(latestHlc.rows[0].hlc));
-      await database.execute(`CREATE INDEX IF NOT EXISTS idx_memories_category ON memories (category)`);
+      await database.execute(`CREATE INDEX IF NOT EXISTS idx_memories_category_id ON memories (category_id)`);
       await database.execute(`CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories (scope)`);
       await database.execute(
         'CREATE INDEX IF NOT EXISTS idx_memories_owner_scope ON memories (tenant_id, tenant_member_id, context_team_id, scope, updated_at DESC)'
+      );
+      // 可管理分类表：name 账号内唯一（应用层大小写归一判重，归档后释放名称）
+      await database.execute(`
+        CREATE TABLE IF NOT EXISTS memory_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          sort INTEGER NOT NULL DEFAULT 0,
+          source TEXT NOT NULL DEFAULT 'manual',
+          archived_at INTEGER,
+          tenant_id TEXT,
+          tenant_member_id TEXT,
+          version INTEGER NOT NULL DEFAULT 1,
+          hlc TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      const seedNow = Date.now();
+      for (const seed of SEED_CATEGORIES) {
+        await database.execute({
+          sql: `INSERT OR IGNORE INTO memory_categories
+            (id, name, description, sort, source, archived_at, tenant_id, tenant_member_id, version, hlc, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'manual', NULL, ?, ?, 1, NULL, ?, ?)`,
+          args: [
+            seed.id,
+            seed.name,
+            seed.description,
+            seed.sort,
+            identity.tenantId,
+            identity.tenantMemberId,
+            seedNow,
+            seedNow,
+          ],
+        });
+      }
+      await database.execute({
+        sql: `UPDATE memory_categories SET tenant_id = ?, tenant_member_id = ?
+          WHERE tenant_id IS NULL OR tenant_member_id IS NULL`,
+        args: [identity.tenantId, identity.tenantMemberId],
+      });
+      await database.execute(
+        'CREATE INDEX IF NOT EXISTS idx_memory_categories_owner ON memory_categories (tenant_id, tenant_member_id, sort, created_at)'
       );
       await database.execute(`
         CREATE TABLE IF NOT EXISTS memory_runs (
@@ -217,14 +267,49 @@ export async function getMemoryStoreContext() {
 // 类型
 // ============================================================
 
-export type MemoryCategory = 'preference' | 'fact' | 'requirement' | 'event';
 export type MemorySource = 'manual' | 'auto' | 'consolidated';
 /** 记忆空间：chat=普通会话，code=编程会话独有 */
 export type MemoryScope = 'chat' | 'code';
+/** 分类来源：manual=用户手动创建；consolidated=整理时由模型新建（决策 D2） */
+export type MemoryCategorySource = 'manual' | 'consolidated';
+
+/** 「未分类」过滤值（listMemories 与路由层共用）：category_id IS NULL */
+export const UNCATEGORIZED_FILTER = '__uncategorized__';
+
+/** 分类上限与字段长度（决策 D5：分类 ≤500、名称 ≤20 字、说明 ≤200 字） */
+export const MAX_MEMORY_CATEGORIES = 500;
+export const MAX_CATEGORY_NAME_LENGTH = 20;
+export const MAX_CATEGORY_DESCRIPTION_LENGTH = 200;
+
+/**
+ * 种子分类：id 沿用旧 category 枚举值（偏好/事实/要求/事件），
+ * 使 retention 先验（CATEGORY_SALIENCE）与召回 semanticType 映射对种子继续有效。
+ */
+export const SEED_CATEGORIES: ReadonlyArray<{ id: string; name: string; description: string; sort: number }> = [
+  { id: 'preference', name: '偏好习惯', description: '用户的偏好、习惯与常用做法', sort: 0 },
+  { id: 'fact', name: '个人事实', description: '关于用户的稳定事实（身份、关系、背景）', sort: 1 },
+  { id: 'requirement', name: '要求约束', description: '用户对协作方式与输出格式的要求、约束', sort: 2 },
+  { id: 'event', name: '重要事件', description: '对用户有长期意义的事件', sort: 3 },
+];
+
+/** 可管理分类（个人记忆的归档维度；不参与召回） */
+export interface MemoryCategoryEntry {
+  id: string;
+  name: string;
+  description: string | null;
+  sort: number;
+  source: MemoryCategorySource;
+  archivedAt: number | null;
+  version: number;
+  hlc: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
 
 export interface MemoryEntry {
   id: string;
-  category: MemoryCategory;
+  /** 分类 id；null=未分类 */
+  categoryId: string | null;
   title: string;
   content: string;
   source: MemorySource;
@@ -259,13 +344,6 @@ export interface MemoryRun {
   createdAt: number;
 }
 
-export const CATEGORY_META: Record<MemoryCategory, { label: string; color: string }> = {
-  preference: { label: '偏好习惯', color: 'bg-sky-100 text-sky-700' },
-  fact: { label: '个人事实', color: 'bg-emerald-100 text-emerald-700' },
-  requirement: { label: '要求约束', color: 'bg-amber-100 text-amber-700' },
-  event: { label: '重要事件', color: 'bg-purple-100 text-purple-700' },
-};
-
 // ============================================================
 // 记忆条目 CRUD
 // ============================================================
@@ -277,7 +355,7 @@ interface Row {
 function toEntry(r: Row): MemoryEntry {
   return {
     id: String(r.id),
-    category: String(r.category) as MemoryCategory,
+    categoryId: r.category_id === null || r.category_id === undefined ? null : String(r.category_id),
     title: String(r.title),
     content: String(r.content),
     source: String(r.source ?? 'manual') as MemorySource,
@@ -299,7 +377,8 @@ function toEntry(r: Row): MemoryEntry {
 }
 
 export async function listMemories(
-  category?: MemoryCategory,
+  /** 分类过滤：分类 id、UNCATEGORIZED_FILTER（未分类）或 undefined（全部） */
+  categoryId?: string,
   search?: string,
   /** 作用域过滤：单个 scope 或数组。不传=全部。编程会话传 ['chat','code']，普通会话传 'chat' */
   scope?: MemoryScope | MemoryScope[]
@@ -313,9 +392,11 @@ export async function listMemories(
     '(context_team_id IS NULL OR context_team_id = ?)',
     'deleted_at IS NULL',
   ];
-  if (category) {
-    where.push('category = ?');
-    args.push(category);
+  if (categoryId === UNCATEGORIZED_FILTER) {
+    where.push('category_id IS NULL');
+  } else if (categoryId) {
+    where.push('category_id = ?');
+    args.push(categoryId);
   }
   if (search?.trim()) {
     where.push('(title LIKE ? OR content LIKE ?)');
@@ -349,7 +430,10 @@ export async function getMemory(id: string): Promise<MemoryEntry | null> {
 }
 
 export async function createMemory(input: {
-  category?: MemoryCategory;
+  /** 分类 id（null=未分类）；与 categoryName 同时给出时以 categoryId 为准 */
+  categoryId?: string | null;
+  /** 分类名（按名解析为 id，未命中落未分类；供 <memorize> 协议与兜底抽取使用） */
+  categoryName?: string;
   title: string;
   content: string;
   source?: MemorySource;
@@ -360,7 +444,10 @@ export async function createMemory(input: {
   const { database, identity } = await getDb();
   const id = newUlid();
   const now = Date.now();
-  const cat = input.category ?? 'fact';
+  const categoryId = await resolveMemoryCategoryRef({
+    categoryId: input.categoryId,
+    categoryName: input.categoryName,
+  });
   const src = input.source ?? 'manual';
   const scope = input.scope ?? 'chat';
   const forgetAfter =
@@ -368,12 +455,12 @@ export async function createMemory(input: {
   const hlc = nextHlc();
   await database.execute({
     sql: `INSERT INTO memories
-      (id, category, title, content, source, scope, pinned, tenant_id, tenant_member_id, context_team_id,
+      (id, category_id, title, content, source, scope, pinned, tenant_id, tenant_member_id, context_team_id,
        version, hlc, deleted_at, forget_after, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, NULL, 1, ?, NULL, ?, ?, ?)`,
     args: [
       id,
-      cat,
+      categoryId,
       input.title,
       input.content,
       src,
@@ -392,7 +479,7 @@ export async function createMemory(input: {
   markPersonalSyncDirty();
   return {
     id,
-    category: cat,
+    categoryId,
     title: input.title,
     content: input.content,
     source: src,
@@ -416,7 +503,7 @@ export async function createMemory(input: {
 export async function updateMemory(
   id: string,
   patch: Partial<
-    Pick<MemoryEntry, 'category' | 'title' | 'content' | 'pinned' | 'scope' | 'importance' | 'forgetAfter'>
+    Pick<MemoryEntry, 'categoryId' | 'title' | 'content' | 'pinned' | 'scope' | 'importance' | 'forgetAfter'>
   >,
   expectedVersion: number
 ): Promise<MemoryEntry> {
@@ -424,9 +511,10 @@ export async function updateMemory(
   const { database, identity } = await getDb();
   const sets: string[] = [];
   const args: (string | number | null)[] = [];
-  if (patch.category !== undefined) {
-    sets.push('category = ?');
-    args.push(patch.category);
+  if (patch.categoryId !== undefined) {
+    if (patch.categoryId !== null) await assertMemoryCategoryActive(patch.categoryId);
+    sets.push('category_id = ?');
+    args.push(patch.categoryId);
   }
   if (patch.title !== undefined) {
     sets.push('title = ?');
@@ -525,6 +613,234 @@ export async function countMemories(): Promise<number> {
     args: [identity.tenantId, identity.tenantMemberId, identity.activeTeamId],
   });
   return Number((r.rows[0] as Row)?.n ?? 0);
+}
+
+// ============================================================
+// 分类 CRUD（2026-09-29；决策 D1 单轴 / D3 id 引用与归档式删除 / D5 上限）
+// ============================================================
+
+function toCategory(r: Row): MemoryCategoryEntry {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description === null || r.description === undefined ? null : String(r.description),
+    sort: Number(r.sort ?? 0),
+    source: String(r.source ?? 'manual') as MemoryCategorySource,
+    archivedAt: r.archived_at === null || r.archived_at === undefined ? null : Number(r.archived_at),
+    version: Number(r.version ?? 1),
+    hlc: r.hlc === null || r.hlc === undefined ? null : String(r.hlc),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+  };
+}
+
+function normalizeCategoryName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ');
+}
+
+export async function listMemoryCategories(
+  options: { includeArchived?: boolean } = {}
+): Promise<MemoryCategoryEntry[]> {
+  const { database, identity } = await getDb();
+  const where = ['tenant_id = ?', 'tenant_member_id = ?'];
+  if (!options.includeArchived) where.push('archived_at IS NULL');
+  const result = await database.execute({
+    sql: `SELECT * FROM memory_categories WHERE ${where.join(' AND ')} ORDER BY sort ASC, created_at ASC`,
+    args: [identity.tenantId, identity.tenantMemberId],
+  });
+  return result.rows.map(toCategory);
+}
+
+export async function getMemoryCategory(id: string): Promise<MemoryCategoryEntry | null> {
+  const { database, identity } = await getDb();
+  const result = await database.execute({
+    sql: 'SELECT * FROM memory_categories WHERE id = ? AND tenant_id = ? AND tenant_member_id = ?',
+    args: [id, identity.tenantId, identity.tenantMemberId],
+  });
+  const r = result.rows[0];
+  return r ? toCategory(r as Row) : null;
+}
+
+/** 按名称查找活跃分类（trim + 空白归一后大小写不敏感精确匹配） */
+export async function findMemoryCategoryByName(name: string): Promise<MemoryCategoryEntry | null> {
+  const normalized = normalizeCategoryName(name).toLowerCase();
+  if (!normalized) return null;
+  const active = await listMemoryCategories();
+  return active.find((category) => category.name.toLowerCase() === normalized) ?? null;
+}
+
+async function assertMemoryCategoryActive(id: string): Promise<void> {
+  const category = await getMemoryCategory(id);
+  if (!category || category.archivedAt !== null) throw new Error('CATEGORY_NOT_FOUND');
+}
+
+/** 解析分类引用：categoryId 优先（校验存在且未归档）；否则按 categoryName 解析（未命中→未分类） */
+export async function resolveMemoryCategoryRef(input: {
+  categoryId?: string | null;
+  categoryName?: string;
+}): Promise<string | null> {
+  if (typeof input.categoryId === 'string' && input.categoryId.trim()) {
+    const id = input.categoryId.trim();
+    await assertMemoryCategoryActive(id);
+    return id;
+  }
+  if (typeof input.categoryName === 'string' && input.categoryName.trim()) {
+    const found = await findMemoryCategoryByName(input.categoryName);
+    return found ? found.id : null;
+  }
+  return null;
+}
+
+export async function createMemoryCategory(input: {
+  name: string;
+  description?: string | null;
+  source?: MemoryCategorySource;
+}): Promise<MemoryCategoryEntry> {
+  const { database, identity } = await getDb();
+  const name = normalizeCategoryName(input.name ?? '');
+  if (!name || name.length > MAX_CATEGORY_NAME_LENGTH) throw new Error('CATEGORY_NAME_INVALID');
+  const description = input.description?.trim()
+    ? input.description.trim().slice(0, MAX_CATEGORY_DESCRIPTION_LENGTH)
+    : null;
+  const total = await database.execute({
+    sql: 'SELECT COUNT(*) AS n FROM memory_categories WHERE tenant_id = ? AND tenant_member_id = ?',
+    args: [identity.tenantId, identity.tenantMemberId],
+  });
+  if (Number((total.rows[0] as Row)?.n ?? 0) >= MAX_MEMORY_CATEGORIES) throw new Error('CATEGORY_LIMIT_REACHED');
+  if (await findMemoryCategoryByName(name)) throw new Error('CATEGORY_NAME_DUPLICATE');
+  const maxSort = await database.execute({
+    sql: 'SELECT COALESCE(MAX(sort), -1) AS n FROM memory_categories WHERE tenant_id = ? AND tenant_member_id = ?',
+    args: [identity.tenantId, identity.tenantMemberId],
+  });
+  const id = newUlid();
+  const now = Date.now();
+  const hlc = nextHlc();
+  const sort = Number((maxSort.rows[0] as Row)?.n ?? -1) + 1;
+  await database.execute({
+    sql: `INSERT INTO memory_categories
+      (id, name, description, sort, source, archived_at, tenant_id, tenant_member_id, version, hlc, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 1, ?, ?, ?)`,
+    args: [
+      id,
+      name,
+      description,
+      sort,
+      input.source ?? 'manual',
+      identity.tenantId,
+      identity.tenantMemberId,
+      hlc,
+      now,
+      now,
+    ],
+  });
+  markPersonalSyncDirty();
+  return {
+    id,
+    name,
+    description,
+    sort,
+    source: input.source ?? 'manual',
+    archivedAt: null,
+    version: 1,
+    hlc,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export async function updateMemoryCategory(
+  id: string,
+  patch: { name?: string; description?: string | null; sort?: number },
+  expectedVersion: number
+): Promise<MemoryCategoryEntry> {
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new Error('CATEGORY_VERSION_CONFLICT');
+  const { database, identity } = await getDb();
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  if (patch.name !== undefined) {
+    const name = normalizeCategoryName(patch.name);
+    if (!name || name.length > MAX_CATEGORY_NAME_LENGTH) throw new Error('CATEGORY_NAME_INVALID');
+    const duplicate = await findMemoryCategoryByName(name);
+    if (duplicate && duplicate.id !== id) throw new Error('CATEGORY_NAME_DUPLICATE');
+    sets.push('name = ?');
+    args.push(name);
+  }
+  if (patch.description !== undefined) {
+    sets.push('description = ?');
+    args.push(patch.description?.trim() ? patch.description.trim().slice(0, MAX_CATEGORY_DESCRIPTION_LENGTH) : null);
+  }
+  if (patch.sort !== undefined) {
+    sets.push('sort = ?');
+    args.push(Number.isFinite(patch.sort) ? Math.trunc(patch.sort) : 0);
+  }
+  if (sets.length === 0) {
+    const current = await getMemoryCategory(id);
+    if (!current || current.archivedAt !== null) throw new Error('CATEGORY_NOT_FOUND');
+    return current;
+  }
+  const updatedAt = Date.now();
+  const hlc = nextHlc();
+  sets.push('updated_at = ?', 'hlc = ?', 'version = version + 1');
+  args.push(updatedAt, hlc);
+  args.push(id, identity.tenantId, identity.tenantMemberId, expectedVersion);
+  const result = await database.execute({
+    sql: `UPDATE memory_categories SET ${sets.join(', ')}
+      WHERE id = ? AND tenant_id = ? AND tenant_member_id = ? AND archived_at IS NULL AND version = ?`,
+    args,
+  });
+  if (result.rowsAffected === 0) {
+    if (await getMemoryCategory(id)) throw new Error('CATEGORY_VERSION_CONFLICT');
+    throw new Error('CATEGORY_NOT_FOUND');
+  }
+  markPersonalSyncDirty();
+  return (await getMemoryCategory(id))!;
+}
+
+/**
+ * 归档式删除（决策 D3）：先校验版本 → 归档分类（软删，名称释放）→ 把引用该分类的记忆
+ * 迁往 reassignTo（null=未分类），每条记忆 version+1 并刷新 HLC，供同步按序应用。
+ */
+export async function archiveMemoryCategory(
+  id: string,
+  expectedVersion: number,
+  reassignTo: string | null
+): Promise<{ reassigned: number }> {
+  const { database, identity } = await getDb();
+  const category = await getMemoryCategory(id);
+  if (!category || category.archivedAt !== null) throw new Error('CATEGORY_NOT_FOUND');
+  if (reassignTo !== null) {
+    if (reassignTo === id) throw new Error('CATEGORY_REASSIGN_INVALID');
+    await assertMemoryCategoryActive(reassignTo);
+  }
+  const now = Date.now();
+  const hlc = nextHlc();
+  const archived = await database.execute({
+    sql: `UPDATE memory_categories SET archived_at = ?, version = version + 1, hlc = ?, updated_at = ?
+      WHERE id = ? AND tenant_id = ? AND tenant_member_id = ? AND archived_at IS NULL AND version = ?`,
+    args: [now, hlc, now, id, identity.tenantId, identity.tenantMemberId, expectedVersion],
+  });
+  if (archived.rowsAffected === 0) throw new Error('CATEGORY_VERSION_CONFLICT');
+  const moved = await database.execute({
+    sql: `UPDATE memories SET category_id = ?, version = version + 1, hlc = ?, updated_at = ?
+      WHERE category_id = ? AND tenant_id = ? AND tenant_member_id = ?`,
+    args: [reassignTo, hlc, now, id, identity.tenantId, identity.tenantMemberId],
+  });
+  markPersonalSyncDirty();
+  return { reassigned: moved.rowsAffected };
+}
+
+/** 各分类引用计数（key '' = 未分类）；供 UI 展示与整理提示词按使用量排序 */
+export async function countMemoriesByCategory(): Promise<Map<string, number>> {
+  const { database, identity } = await getDb();
+  const result = await database.execute({
+    sql: `SELECT COALESCE(category_id, '') AS category_id, COUNT(*) AS n FROM memories
+      WHERE tenant_id = ? AND tenant_member_id = ? AND (context_team_id IS NULL OR context_team_id = ?) AND deleted_at IS NULL
+      GROUP BY COALESCE(category_id, '')`,
+    args: [identity.tenantId, identity.tenantMemberId, identity.activeTeamId],
+  });
+  const counts = new Map<string, number>();
+  for (const row of result.rows) counts.set(String(row.category_id), Number(row.n ?? 0));
+  return counts;
 }
 
 // ============================================================

@@ -16,7 +16,6 @@ import {
   listMemoryAccessLogs,
   updateMemory,
   MEMORY_ACCESS_LOG_CAP,
-  type MemoryCategory,
   type MemoryEntry,
 } from './memory-store.js';
 
@@ -28,8 +27,8 @@ export const RETENTION = {
   coldThreshold: 0.15,
 } as const;
 
-/** 分类显著度先验（映射 agentmemory 的类型先验到本项目分类） */
-export const CATEGORY_SALIENCE: Record<MemoryCategory, number> = {
+/** 分类显著度先验：按分类 id 映射（种子分类沿用旧枚举值 id；未知/新分类走默认 0.5） */
+export const CATEGORY_SALIENCE: Record<string, number> = {
   requirement: 0.85,
   preference: 0.8,
   event: 0.6,
@@ -45,8 +44,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const CANDIDATE_MIN_AGE_DAYS = 30;
 
 /** salience = min(1, max(分类先验, importance) + min(0.2, recallCount×0.02)) */
-export function salienceOf(memory: Pick<MemoryEntry, 'category' | 'importance' | 'recallCount'>): number {
-  const base = Math.max(CATEGORY_SALIENCE[memory.category] ?? 0.5, memory.importance);
+export function salienceOf(memory: Pick<MemoryEntry, 'categoryId' | 'importance' | 'recallCount'>): number {
+  const base = Math.max(CATEGORY_SALIENCE[memory.categoryId ?? ''] ?? 0.5, memory.importance);
   return Math.min(1, base + Math.min(0.2, memory.recallCount * 0.02));
 }
 
@@ -55,7 +54,7 @@ export function salienceOf(memory: Pick<MemoryEntry, 'category' | 'importance' |
  * Δt 以最近一次更新/召回为准；daysSince_access 下限 1 天（单次访问最多贡献 σ）。
  */
 export function retentionOf(
-  memory: Pick<MemoryEntry, 'category' | 'importance' | 'recallCount' | 'updatedAt' | 'lastRecalledAt'>,
+  memory: Pick<MemoryEntry, 'categoryId' | 'importance' | 'recallCount' | 'updatedAt' | 'lastRecalledAt'>,
   accessAts: number[] = [],
   now = Date.now()
 ): number {

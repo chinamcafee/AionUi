@@ -110,12 +110,17 @@ export const teamApi = {
       method: 'POST',
       body: JSON.stringify({ userInput, assistantText }),
     }),
-  listMemories: (params: { category?: string; search?: string; scope?: string } = {}) => {
+  listMemories: (params: { categoryId?: string; search?: string; scope?: string } = {}) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
     return request<{ memories: TeamMemoryEntry[] }>(`/teamapi/memories${query ? `?${query}` : ''}`);
   },
-  createMemory: (input: { title: string; content: string; category?: string; scope?: string }) =>
-    request<TeamMemoryEntry>('/teamapi/memories', { method: 'POST', body: JSON.stringify(input) }),
+  createMemory: (input: {
+    title: string;
+    content: string;
+    categoryId?: string | null;
+    categoryName?: string;
+    scope?: string;
+  }) => request<TeamMemoryEntry>('/teamapi/memories', { method: 'POST', body: JSON.stringify(input) }),
   updateMemory: (id: string, patch: Record<string, unknown>, baseVersion: number) =>
     request<{ updated: boolean; memory: TeamMemoryEntry }>(`/teamapi/memories/${id}`, {
       method: 'PATCH',
@@ -125,6 +130,30 @@ export const teamApi = {
     request<{ deleted: boolean }>(`/teamapi/memories/${id}`, {
       method: 'DELETE',
       body: JSON.stringify({ baseVersion }),
+    }),
+  // ── 分类体系（2026-09-29）：个人记忆的归档维度 ──
+  listMemoryCategories: (includeArchived = false) =>
+    request<{ categories: MemoryCategoryView[] }>(
+      `/teamapi/memory-categories${includeArchived ? '?includeArchived=true' : ''}`
+    ),
+  createMemoryCategory: (input: { name: string; description?: string }) =>
+    request<{ created: boolean; category: MemoryCategoryView }>('/teamapi/memory-categories', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateMemoryCategory: (
+    id: string,
+    patch: { name?: string; description?: string | null; sort?: number },
+    baseVersion: number
+  ) =>
+    request<{ updated: boolean; category: MemoryCategoryView }>(`/teamapi/memory-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...patch, baseVersion }),
+    }),
+  deleteMemoryCategory: (id: string, baseVersion: number, reassignTo: string | null) =>
+    request<{ archived: boolean; reassigned: number }>(`/teamapi/memory-categories/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ baseVersion, reassignTo }),
     }),
   consolidateMemories: (scope: 'all' | 'chat' | 'code' = 'all', mode: 'auto' | 'review' = 'auto') =>
     request<TeamConsolidateResult>('/teamapi/memories/consolidate', {
@@ -136,7 +165,7 @@ export const teamApi = {
       method: 'POST',
       body: JSON.stringify({ operations }),
     }),
-  checkMemorySimilarity: (input: { title: string; content: string; category?: string; scope?: string }) =>
+  checkMemorySimilarity: (input: { title: string; content: string; categoryId?: string | null; scope?: string }) =>
     request<{
       level: string;
       existingId?: string;
@@ -149,7 +178,7 @@ export const teamApi = {
     targetId: string;
     mergedTitle: string;
     mergedContent: string;
-    category?: string;
+    categoryId?: string;
   }) =>
     request<{ appliedCount: number }>('/teamapi/memories/merge-pair', {
       method: 'POST',
@@ -354,12 +383,18 @@ export interface TeamPersonalSyncStatus {
 
 export interface TeamConsolidationOperation {
   id: string;
-  type: 'merge' | 'update' | 'delete';
+  type: 'merge' | 'update' | 'delete' | 'create_category';
   targetId: string;
   sourceIds?: string[];
   title?: string;
   content?: string;
-  category?: string;
+  /** 新建分类操作（决策 D2）：分类名与可选说明 */
+  name?: string;
+  description?: string;
+  /** 分类指派：现有分类 id 或 null（未分类） */
+  categoryId?: string | null;
+  /** 本次计划内新建分类的名称引用 */
+  categoryName?: string;
   reason: string;
 }
 
@@ -402,13 +437,27 @@ async function fetchRaw<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface TeamMemoryEntry {
   id: string;
-  category: 'preference' | 'fact' | 'requirement' | 'event';
+  /** 分类 id；null=未分类 */
+  categoryId: string | null;
   title: string;
   content: string;
   scope: 'chat' | 'code';
   pinned: boolean;
   version: number;
   source?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 个人记忆分类（可管理归档维度；不参与召回） */
+export interface MemoryCategoryView {
+  id: string;
+  name: string;
+  description: string | null;
+  sort: number;
+  source: 'manual' | 'consolidated';
+  archivedAt: number | null;
+  version: number;
   createdAt: number;
   updatedAt: number;
 }

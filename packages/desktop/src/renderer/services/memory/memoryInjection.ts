@@ -48,7 +48,8 @@ const MEMORIZE_PARTIAL_RE = /<memorize\b[^>]*>?$/i;
 
 export interface MemorizeBlock {
   audience: 'personal' | 'team';
-  category: 'preference' | 'fact' | 'requirement' | 'event';
+  /** 分类名（可选，来自用户现有分类清单）；null=未分类，留待整理时归档 */
+  categoryName: string | null;
   scope: 'chat' | 'code';
   title: string;
   content: string;
@@ -56,7 +57,7 @@ export interface MemorizeBlock {
 
 function normalizeMemorizeBlock(rawAttrs: string, rawContent: string): MemorizeBlock | null {
   const attr = (name: string) => new RegExp(`${name}="([^"]*)"`, 'i').exec(rawAttrs)?.[1]?.trim() ?? '';
-  const category = attr('category');
+  const categoryName = attr('category').slice(0, 20) || null;
   const scope = attr('scope');
   const audience = (attr('audience') || 'personal').toLowerCase();
   const content = rawContent.trim();
@@ -64,9 +65,7 @@ function normalizeMemorizeBlock(rawAttrs: string, rawContent: string): MemorizeB
   if (!content) return null;
   return {
     audience: audience === 'team' ? 'team' : 'personal',
-    category: (['preference', 'fact', 'requirement', 'event'] as const).includes(category as never)
-      ? (category as MemorizeBlock['category'])
-      : 'fact',
+    categoryName,
     scope: scope === 'code' ? 'code' : 'chat',
     title,
     content: content.slice(0, 2_000),
@@ -92,15 +91,43 @@ export function stripMemorizeBlocks(text: string): string {
     .trimEnd();
 }
 
-/** 注入到上下文块的协议指令（仅团队功能启用时附带）。 */
-export const MEMORIZE_PROTOCOL_DIRECTIVE = [
-  '【记忆协议·最高优先级】当用户要求"记住/记一下"某信息，或本轮出现值得长期记住的用户/团队信息时：',
-  '1. 禁止使用你自带的记忆文件/memory 目录/markdown 笔记等任何本地记忆机制来记录这些信息；',
-  '2. 必须在回复正文的最末尾追加一行（不要放进思考过程）：',
-  '<memorize audience="personal或team" category="preference|fact|requirement|event" scope="chat或code" title="不超过20字标题">记忆内容</memorize>',
-  'audience 判定【硬规则】：默认一律用 personal。只有当用户本轮明确说出"团队共享/团队记忆/全员/让大家都用"等字样时才用 team；用户未明确要求共享的任何信息（包括公司/项目/业务信息）都属 personal。可一次输出多个 memorize 块。',
-  '没有值得记的信息就完全不要输出该标记。该标记不会展示给用户，也不属于你的文件记忆系统。',
-].join('\n');
+/** 注入到上下文块的协议指令（仅团队功能启用时附带）；分类清单动态生成（决策 D1）。 */
+export function buildMemorizeProtocolDirective(categoryNames: string[]): string {
+  const available = categoryNames.slice(0, 30);
+  return [
+    '【记忆协议·最高优先级】当用户要求"记住/记一下"某信息，或本轮出现值得长期记住的用户/团队信息时：',
+    '1. 禁止使用你自带的记忆文件/memory 目录/markdown 笔记等任何本地记忆机制来记录这些信息；',
+    '2. 必须在回复正文的最末尾追加一行（不要放进思考过程）：',
+    '<memorize audience="personal或team" category="分类名（可选）" scope="chat或code" title="不超过20字标题">记忆内容</memorize>',
+    available.length > 0
+      ? `category 只能从下列现有分类中选最合适的一个；没有合适的就直接省略该属性（留待整理时归档）：${available.join('、')}`
+      : 'category 可省略；当前还没有分类，留待整理时归档。',
+    'audience 判定【硬规则】：默认一律用 personal。只有当用户本轮明确说出"团队共享/团队记忆/全员/让大家都用"等字样时才用 team；用户未明确要求共享的任何信息（包括公司/项目/业务信息）都属 personal。可一次输出多个 memorize 块。',
+    '没有值得记的信息就完全不要输出该标记。该标记不会展示给用户，也不属于你的文件记忆系统。',
+  ].join('\n');
+}
+
+// 分类清单缓存：发送路径每轮都要注入分类名，60s TTL + 分类变更时显式失效（MemoryPage 调用）
+const CATEGORY_CACHE_TTL_MS = 60_000;
+let memorizeCategoryCache: { at: number; names: string[] } | null = null;
+
+export function invalidateMemorizeCategoryCache(): void {
+  memorizeCategoryCache = null;
+}
+
+async function loadMemorizeCategoryNames(): Promise<string[]> {
+  if (memorizeCategoryCache && Date.now() - memorizeCategoryCache.at < CATEGORY_CACHE_TTL_MS) {
+    return memorizeCategoryCache.names;
+  }
+  try {
+    const result = await teamApi.listMemoryCategories();
+    const names = (result?.categories ?? []).map((category) => category.name);
+    memorizeCategoryCache = { at: Date.now(), names };
+    return names;
+  } catch {
+    return memorizeCategoryCache?.names ?? [];
+  }
+}
 
 // 会话级抽取去重：同一轮交换（用户文本签名）只抽取一次；
 // 回合结束与下一轮发送双触发共用，双保险防漏触发且不产生重复记忆。
@@ -140,7 +167,7 @@ async function handleNewMemoryMerge(created: {
   id: string;
   title: string;
   content: string;
-  category?: string;
+  categoryId?: string | null;
   scope?: string;
 }): Promise<void> {
   let check: Awaited<ReturnType<typeof teamApi.checkMemorySimilarity>>;
@@ -148,7 +175,7 @@ async function handleNewMemoryMerge(created: {
     check = await teamApi.checkMemorySimilarity({
       title: created.title,
       content: created.content,
-      category: created.category,
+      categoryId: created.categoryId ?? null,
       scope: created.scope,
     });
   } catch {
@@ -163,7 +190,7 @@ async function handleNewMemoryMerge(created: {
         targetId: check.existingId!,
         mergedTitle: check.mergedTitle!,
         mergedContent: check.mergedContent!,
-        category: created.category,
+        categoryId: created.categoryId ?? undefined,
       })
       .then((r) => {
         // eslint-disable-next-line no-console
@@ -237,14 +264,14 @@ function submitMemorizeBlocks(blocks: MemorizeBlock[], userText: string): void {
         ? teamApi.createTeamMemory({
             title: block.title,
             content: block.content,
-            category: block.category,
+            category: block.categoryName ?? 'fact',
             memoryScope: block.scope,
             tags: [],
           })
         : teamApi.createMemory({
             title: block.title,
             content: block.content,
-            category: block.category,
+            categoryName: block.categoryName ?? undefined,
             scope: block.scope,
           });
     void request
@@ -259,15 +286,14 @@ function submitMemorizeBlocks(blocks: MemorizeBlock[], userText: string): void {
         );
         // 个人记忆新增后查重 + 双模式合并（E-18）
         if (block.audience === 'personal') {
-          const created = result as { id?: string } | { candidate?: { id?: string } } | null;
-          const createdId =
-            (created as { id?: string })?.id ?? (created as { candidate?: { id?: string } })?.candidate?.id;
+          const created = result as { id?: string; categoryId?: string | null } | null;
+          const createdId = created?.id;
           if (typeof createdId === 'string') {
             void handleNewMemoryMerge({
               id: createdId,
               title: block.title,
               content: block.content,
-              category: block.category,
+              categoryId: created?.categoryId ?? null,
               scope: block.scope,
             });
           }
@@ -352,12 +378,13 @@ export async function enhanceInputWithTeamMemory(rawInput: string, options: Enha
       includeKnowledge: options.includeKnowledge,
     });
     const rendered = (result as { rendered?: string | null })?.rendered;
+    const directive = buildMemorizeProtocolDirective(await loadMemorizeCategoryNames());
     if (rendered && rendered.trim() && !rawInput.includes(INJECTION_MARK)) {
-      return `${INJECTION_MARK}\n${rendered}\n${MEMORIZE_PROTOCOL_DIRECTIVE}\n${INJECTION_MARK_END}\n${rawInput}`;
+      return `${INJECTION_MARK}\n${rendered}\n${directive}\n${INJECTION_MARK_END}\n${rawInput}`;
     }
     // 未召回相关记忆时也附带记忆协议（是否有记忆由模型判断，与召回无关）
     if (!rawInput.includes(INJECTION_MARK)) {
-      return `${INJECTION_MARK}\n${MEMORIZE_PROTOCOL_DIRECTIVE}\n${INJECTION_MARK_END}\n${rawInput}`;
+      return `${INJECTION_MARK}\n${directive}\n${INJECTION_MARK_END}\n${rawInput}`;
     }
     return rawInput;
   } catch {

@@ -2,14 +2,19 @@
 // 差异：挂载前缀 /teamapi/memories*（AionUi 约定）；账号前置中间件沿用上游（无 subject → 409）；
 // schedule 系列（Mastra 定时）不在移植范围。错误码与响应形状与上游一致，便于 MemoryPage UI 平移。
 
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import {
   listMemories,
   createMemory,
   updateMemory,
   deleteMemory,
   listRuns,
-  type MemoryCategory,
+  listMemoryCategories,
+  createMemoryCategory,
+  updateMemoryCategory,
+  archiveMemoryCategory,
+  getMemoryCategory,
+  UNCATEGORIZED_FILTER,
   type MemoryScope,
 } from './memory-store.js';
 import {
@@ -66,6 +71,12 @@ function isAccountContextError(error: unknown) {
       'MEMORY_NOT_FOUND',
       'MEMORY_BASE_VERSION_REQUIRED',
       'MEMORY_VERSION_CONFLICT',
+      'CATEGORY_NOT_FOUND',
+      'CATEGORY_NAME_INVALID',
+      'CATEGORY_NAME_DUPLICATE',
+      'CATEGORY_LIMIT_REACHED',
+      'CATEGORY_VERSION_CONFLICT',
+      'CATEGORY_REASSIGN_INVALID',
       'PROJECT_CAPABILITY_INVALID',
       'KNOWLEDGE_FILTER_INVALID',
     ].includes(error.message)
@@ -75,7 +86,7 @@ function isAccountContextError(error: unknown) {
 export function createMemoryRoutes() {
   const app = new Hono();
 
-  app.use('/memories/*', async (c, next) => {
+  const requireAccount: MiddlewareHandler = async (c, next) => {
     let active = false;
     try {
       active = accountRuntime.currentSubject() !== null;
@@ -87,11 +98,84 @@ export function createMemoryRoutes() {
       return c.json({ error: 'ACCOUNT_RUNTIME_REQUIRED' }, 409);
     }
     await next();
+  };
+
+  app.use('/memories/*', requireAccount);
+  app.use('/memory-categories/*', requireAccount);
+  app.use('/memory-categories', requireAccount);
+
+  // ── 分类体系（2026-09-29）：个人记忆的归档维度，不参与召回 ──
+  app.get('/memory-categories', async (c) => {
+    c.header('Cache-Control', 'no-store');
+    const includeArchived = c.req.query('includeArchived') === 'true';
+    return c.json({ categories: await listMemoryCategories({ includeArchived }) });
+  });
+
+  app.post('/memory-categories', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; description?: unknown };
+    if (typeof body.name !== 'string' || !body.name.trim()) return c.json({ error: 'CATEGORY_NAME_INVALID' }, 400);
+    if (body.description !== undefined && body.description !== null && typeof body.description !== 'string') {
+      return c.json({ error: 'CATEGORY_DESCRIPTION_INVALID' }, 400);
+    }
+    try {
+      const category = await createMemoryCategory({
+        name: body.name,
+        description: typeof body.description === 'string' ? body.description : null,
+      });
+      return c.json({ created: true, category }, 201);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'CATEGORY_CREATE_FAILED';
+      return c.json({ error: code }, isAccountContextError(error) ? 409 : 400);
+    }
+  });
+
+  app.patch('/memory-categories/:id', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: unknown;
+      description?: unknown;
+      sort?: unknown;
+      baseVersion?: unknown;
+    };
+    try {
+      const category = await updateMemoryCategory(
+        c.req.param('id'),
+        {
+          ...(body.name !== undefined ? { name: String(body.name) } : {}),
+          ...(body.description !== undefined
+            ? { description: body.description === null ? null : String(body.description) }
+            : {}),
+          ...(body.sort !== undefined ? { sort: Number(body.sort) } : {}),
+        },
+        Number(body.baseVersion)
+      );
+      return c.json({ updated: true, category });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'CATEGORY_UPDATE_FAILED';
+      return c.json({ error: code }, isAccountContextError(error) ? 409 : 400);
+    }
+  });
+
+  app.delete('/memory-categories/:id', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { baseVersion?: unknown; reassignTo?: unknown };
+    if (body.reassignTo !== undefined && body.reassignTo !== null && typeof body.reassignTo !== 'string') {
+      return c.json({ error: 'CATEGORY_REASSIGN_INVALID' }, 400);
+    }
+    try {
+      const result = await archiveMemoryCategory(
+        c.req.param('id'),
+        Number(body.baseVersion),
+        typeof body.reassignTo === 'string' ? body.reassignTo : null
+      );
+      return c.json({ archived: true, reassigned: result.reassigned });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'CATEGORY_DELETE_FAILED';
+      return c.json({ error: code }, isAccountContextError(error) ? 409 : 400);
+    }
   });
 
   app.get('/memories', async (c) => {
     c.header('Cache-Control', 'no-store');
-    const category = c.req.query('category') as MemoryCategory | undefined;
+    const categoryId = c.req.query('categoryId') ?? undefined;
     const search = c.req.query('search') ?? undefined;
     const scopeRaw = c.req.query('scope');
     let scope: MemoryScope | MemoryScope[] | undefined;
@@ -100,37 +184,46 @@ export function createMemoryRoutes() {
       if (scopes.some((s) => !isMemoryScope(s))) return c.json({ error: 'scope 必须是 chat、code 或 chat,code' }, 400);
       scope = scopes as MemoryScope[];
     }
-    return c.json({ memories: await listMemories(category, search, scope) });
+    return c.json({ memories: await listMemories(categoryId, search, scope) });
   });
 
   app.post('/memories', async (c) => {
     const body = (await c.req.json()) as {
       title: string;
       content: string;
-      category?: MemoryCategory;
+      categoryId?: string | null;
+      categoryName?: string;
       scope?: MemoryScope;
       forgetAfter?: unknown;
     };
     if (!body.title?.trim() || !body.content?.trim()) return c.json({ error: '标题与内容不能为空' }, 400);
     if (body.scope !== undefined && !isMemoryScope(body.scope))
       return c.json({ error: 'scope 必须是 chat 或 code' }, 400);
+    if (body.categoryId !== undefined && body.categoryId !== null && typeof body.categoryId !== 'string') {
+      return c.json({ error: 'CATEGORY_NOT_FOUND' }, 400);
+    }
     const forgetAfter =
       typeof body.forgetAfter === 'number' && Number.isFinite(body.forgetAfter) ? body.forgetAfter : null;
-    return c.json(await createMemory({ ...body, forgetAfter }));
+    try {
+      return c.json(await createMemory({ ...body, forgetAfter }));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'MEMORY_CREATE_FAILED';
+      return c.json({ error: code }, isAccountContextError(error) ? 409 : 400);
+    }
   });
 
   app.post('/memories/check', async (c) => {
-    const { title, content, category, scope } = (await c.req.json()) as {
+    const { title, content, categoryId, scope } = (await c.req.json()) as {
       title: string;
       content: string;
-      category?: MemoryCategory;
+      categoryId?: string | null;
       scope?: MemoryScope;
     };
     if (!title?.trim() || !content?.trim()) return c.json({ error: '标题与内容不能为空' }, 400);
     const result = await judgeMemorySimilarity({
       title,
       content,
-      category: (category ?? 'fact') as MemoryCategory,
+      categoryId: typeof categoryId === 'string' && categoryId.trim() ? categoryId.trim() : null,
       scope: (scope ?? 'chat') as MemoryScope,
     });
     return c.json(result);
@@ -141,6 +234,9 @@ export function createMemoryRoutes() {
     const { baseVersion, ...patch } = body;
     if (patch.scope !== undefined && !isMemoryScope(patch.scope)) {
       return c.json({ error: 'scope 必须是 chat 或 code' }, 400);
+    }
+    if (patch.categoryId !== undefined && patch.categoryId !== null && typeof patch.categoryId !== 'string') {
+      return c.json({ error: 'CATEGORY_NOT_FOUND' }, 400);
     }
     try {
       const memory = await updateMemory(
@@ -227,7 +323,7 @@ export function createMemoryRoutes() {
       targetId?: unknown;
       mergedTitle?: unknown;
       mergedContent?: unknown;
-      category?: unknown;
+      categoryId?: unknown;
     } | null;
     if (
       typeof body?.sourceId !== 'string' ||
@@ -248,7 +344,9 @@ export function createMemoryRoutes() {
         sourceIds: [body.sourceId],
         title: body.mergedTitle.trim().slice(0, 200),
         content: body.mergedContent.trim().slice(0, 50_000),
-        ...(typeof body.category === 'string' && body.category.trim() ? { category: body.category.trim() } : {}),
+        ...(typeof body.categoryId === 'string' && body.categoryId.trim()
+          ? { categoryId: body.categoryId.trim() }
+          : {}),
         reason: '用户确认合并（新增时相似检出）',
       };
       const appliedCount = await applyConsolidationOperations([op]);
@@ -350,6 +448,10 @@ export function createMemoryRoutes() {
       const personalMemory = typeof body.personalMemoryId === 'string' ? await getMemory(body.personalMemoryId) : null;
       if (body.personalMemoryId !== undefined && !personalMemory)
         return c.json({ error: 'PERSONAL_MEMORY_NOT_FOUND' }, 404);
+      // 升级场景：个人分类按 id 引用，团队侧暂为自由文本 → 解析为分类名传参（P3 团队分类落地后改为 id）
+      const personalCategoryName = personalMemory?.categoryId
+        ? ((await getMemoryCategory(personalMemory.categoryId))?.name ?? null)
+        : null;
       const { tenantId, teamId } = currentTeamGatewayScope();
       const base = `/api/v1/tenants/${encodeURIComponent(tenantId)}/teams/${encodeURIComponent(teamId)}`;
       const created = (await callTeamGateway(`${base}/team-memories`, {
@@ -358,7 +460,7 @@ export function createMemoryRoutes() {
         body: JSON.stringify({
           title: personalMemory?.title ?? body.title.trim(),
           content: personalMemory?.content ?? body.content.trim(),
-          category: personalMemory?.category ?? body.category.trim(),
+          category: personalCategoryName ?? body.category.trim(),
           memoryScope: personalMemory?.scope ?? body.memoryScope,
           tags,
           source: personalMemory

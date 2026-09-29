@@ -34,7 +34,11 @@ const OP_META: Record<string, { text: string; color: string }> = {
   merge: { text: '合并', color: 'arcoblue' },
   update: { text: '更新', color: 'green' },
   delete: { text: '清理', color: 'red' },
+  create_category: { text: '新建分类', color: 'purple' },
 };
+
+const opTitle = (op: TeamConsolidationOperation) =>
+  op.type === 'create_category' ? (op.name ?? op.id) : (op.title ?? op.targetId.slice(0, 8));
 
 export const MemoryConsolidationCard: React.FC = () => {
   const [state, setState] = useState<CardState>(INITIAL);
@@ -193,7 +197,7 @@ export const MemoryConsolidationCard: React.FC = () => {
                       {meta.text}
                     </Tag>
                     <Typography.Text bold size='small'>
-                      {op.title ?? op.targetId.slice(0, 8)}
+                      {opTitle(op)}
                     </Typography.Text>
                   </div>
                   <Typography.Text type='secondary' size='small' style={{ display: 'block' }}>
@@ -231,7 +235,7 @@ export const MemoryConsolidationCard: React.FC = () => {
                 <Tag size='small' color={meta.color}>
                   {meta.text}
                 </Tag>
-                <Typography.Text size='small'>{op.title ?? op.targetId.slice(0, 8)}</Typography.Text>
+                <Typography.Text size='small'>{opTitle(op)}</Typography.Text>
               </div>
             );
           })}

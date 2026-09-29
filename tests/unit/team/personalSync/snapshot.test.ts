@@ -33,7 +33,7 @@ const ED25519_SPKI_PREFIX = '302a300506032b6570032100';
 async function insertMemory(runtime: AccountRuntimeManager, id: string, title: string, content: string) {
   const now = Date.now();
   await runtime.database('memory').execute({
-    sql: `INSERT INTO memories(id,category,title,content,source,scope,pinned,tenant_id,tenant_member_id,
+    sql: `INSERT INTO memories(id,category_id,title,content,source,scope,pinned,tenant_id,tenant_member_id,
       context_team_id,version,hlc,deleted_at,importance,forget_after,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     args: [

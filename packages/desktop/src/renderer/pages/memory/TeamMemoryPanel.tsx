@@ -17,8 +17,17 @@ import {
   Typography,
 } from '@arco-design/web-react';
 import { IconPlus, IconRefresh } from '@arco-design/web-react/icon';
-import { teamApi, TeamApiError, type TeamMemoryCandidate, type TeamMemoryEntry } from '@/renderer/api/teamClient';
+import { teamApi, TeamApiError, type TeamMemoryCandidate } from '@/renderer/api/teamClient';
 import { useTeamAuth } from '@/renderer/hooks/context/TeamAuthContext';
+
+/** 个人记忆「升级为团队记忆」的带入形状（个人侧按分类 id 引用，团队侧当前为自由文本 → 传分类名） */
+export interface TeamMemoryUpgradeCandidate {
+  id: string;
+  title: string;
+  content: string;
+  categoryName: string | null;
+  scope: 'chat' | 'code';
+}
 
 /** 列表项内嵌最新版本（对象或字符串形态都兼容），取展示字段。 */
 function latestVersionOf(item: TeamMemoryCandidate): Partial<{
@@ -65,14 +74,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export const TeamMemoryPanel: React.FC<{
-  initialUpgrade?: TeamMemoryEntry | null;
+  initialUpgrade?: TeamMemoryUpgradeCandidate | null;
   onUpgradeConsumed?: () => void;
 }> = ({ initialUpgrade, onUpgradeConsumed }) => {
   const { hasPermission } = useTeamAuth();
   const [memories, setMemories] = useState<TeamMemoryCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [upgradeSource, setUpgradeSource] = useState<TeamMemoryEntry | null>(null);
+  const [upgradeSource, setUpgradeSource] = useState<TeamMemoryUpgradeCandidate | null>(null);
   const [draft, setDraft] = useState({ title: '', content: '', category: 'fact', memoryScope: 'chat', tags: '' });
   const [invalidation, setInvalidation] = useState<{ connected: boolean; dirty: boolean } | null>(null);
   const canSubmit = hasPermission('team_memory.submit');
@@ -100,14 +109,14 @@ export const TeamMemoryPanel: React.FC<{
     return () => clearInterval(timer);
   }, [reload]);
 
-  // 个人记忆升级入口（T3.4）：带入标题/内容/分类/空间预填并打开提交 Modal
+  // 个人记忆升级入口（T3.4）：带入标题/内容/分类名/空间预填并打开提交 Modal
   useEffect(() => {
     if (!initialUpgrade) return;
     setUpgradeSource(initialUpgrade);
     setDraft({
       title: initialUpgrade.title.slice(0, 200),
       content: initialUpgrade.content.slice(0, 50_000),
-      category: initialUpgrade.category,
+      category: initialUpgrade.categoryName ?? 'fact',
       memoryScope: initialUpgrade.scope,
       tags: '',
     });

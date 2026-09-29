@@ -250,7 +250,7 @@ describe('BFF mock 全链路', () => {
         body: JSON.stringify({
           title: '偏好：简洁回答',
           content: '用户偏好简洁',
-          category: 'preference',
+          categoryId: 'preference',
           scope: 'chat',
         }),
       })
@@ -258,6 +258,47 @@ describe('BFF mock 全链路', () => {
     expect([200, 201]).toContain(created.status);
     const list = await json(await app.request('/teamapi/memories'));
     expect(list.body.memories.some((m: { title: string }) => m.title.includes('简洁回答'))).toBe(true);
+
+    // ⑤b 分类体系：新建分类 → 归档记忆 → 按分类过滤 → 归档分类并迁移引用（决策 D3）
+    const categoryCreated = await json(
+      await app.request('/teamapi/memory-categories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: '工作流程', description: '与工作推进相关' }),
+      })
+    );
+    expect(categoryCreated.status).toBe(201);
+    const workCategory = categoryCreated.body.category as { id: string; version: number };
+    const categoriesList = await json(await app.request('/teamapi/memory-categories'));
+    expect(categoriesList.body.categories.some((c: { id: string }) => c.id === workCategory.id)).toBe(true);
+
+    const createdWithCategory = await json(
+      await app.request('/teamapi/memories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: '流程：周报',
+          content: '每周五发周报',
+          categoryId: workCategory.id,
+          scope: 'chat',
+        }),
+      })
+    );
+    expect(createdWithCategory.status).toBe(200);
+    const filtered = await json(await app.request(`/teamapi/memories?categoryId=${workCategory.id}`));
+    expect(filtered.body.memories).toHaveLength(1);
+
+    const archived = await json(
+      await app.request(`/teamapi/memory-categories/${workCategory.id}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ baseVersion: workCategory.version, reassignTo: 'fact' }),
+      })
+    );
+    expect(archived.status).toBe(200);
+    expect(archived.body.reassigned).toBe(1);
+    const afterArchive = await json(await app.request('/teamapi/memories?categoryId=fact'));
+    expect(afterArchive.body.memories.some((m: { title: string }) => m.title.includes('周报'))).toBe(true);
 
     // ⑥ 团队记忆提交（201）与列表
     const submitted = await json(

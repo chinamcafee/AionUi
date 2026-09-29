@@ -17,7 +17,8 @@ import { restorePersonalSyncSnapshot } from './snapshot.js';
 
 export interface MemorySyncPayload {
   id: string;
-  category: string;
+  /** 分类 id；null=未分类。分类记录本身自 2026-09-29 起为独立实体，随 P2 同步（快照 v2） */
+  categoryId: string | null;
   title: string;
   content: string;
   source: string;
@@ -167,7 +168,7 @@ async function syncDatabase() {
 function rowToPayload(row: Record<string, unknown>): MemorySyncPayload {
   return {
     id: String(row.id),
-    category: String(row.category),
+    categoryId: row.category_id === null || row.category_id === undefined ? null : String(row.category_id),
     title: String(row.title),
     content: String(row.content),
     source: String(row.source),
@@ -405,7 +406,7 @@ function decryptEvent(event: EncryptedCloudEvent): MemorySyncPayload {
 }
 
 const mergeFields: Array<keyof MemorySyncPayload> = [
-  'category',
+  'categoryId',
   'title',
   'content',
   'source',
@@ -436,16 +437,16 @@ async function writeMemoryPayload(payload: MemorySyncPayload) {
   const memory = accountRuntime.database('memory');
   // 本机召回统计（last_recalled_at/recall_count）不参与同步；冲突更新时保留本机已有值
   await memory.execute({
-    sql: `INSERT INTO memories(id,category,title,content,source,scope,pinned,tenant_id,tenant_member_id,
+    sql: `INSERT INTO memories(id,category_id,title,content,source,scope,pinned,tenant_id,tenant_member_id,
       context_team_id,version,hlc,deleted_at,importance,forget_after,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET category=excluded.category,title=excluded.title,content=excluded.content,
+      ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,title=excluded.title,content=excluded.content,
       source=excluded.source,scope=excluded.scope,pinned=excluded.pinned,context_team_id=excluded.context_team_id,
       version=excluded.version,hlc=excluded.hlc,deleted_at=excluded.deleted_at,importance=excluded.importance,
       forget_after=excluded.forget_after,updated_at=excluded.updated_at`,
     args: [
       payload.id,
-      payload.category,
+      payload.categoryId,
       payload.title,
       payload.content,
       payload.source,
